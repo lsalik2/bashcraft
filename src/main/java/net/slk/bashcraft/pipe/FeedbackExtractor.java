@@ -8,8 +8,8 @@ import java.util.regex.Pattern;
 final class FeedbackExtractor {
     private static final String NUM = "-?\\d+(?:\\.\\d+)?";
     private static final Pattern TRIPLE = Pattern.compile("(" + NUM + "|~)\\s*,\\s*(" + NUM + "|~)\\s*,\\s*(" + NUM + "|~)");
-    /** A standalone number: not glued to letters, ids or other digits. */
-    private static final Pattern NUMBER = Pattern.compile("(?<![\\w.:-])" + NUM + "(?![\\w:])");
+    /** A standalone number, optionally with an NBT type suffix (20.0f): not glued to letters, ids or other digits. */
+    private static final Pattern NUMBER = Pattern.compile("(?<![\\w.:-])(" + NUM + ")[bBsSlLfFdD]?(?![\\w:]|\\.\\d)");
 
     private FeedbackExtractor() {}
 
@@ -26,7 +26,7 @@ final class FeedbackExtractor {
         Matcher number = NUMBER.matcher(text);
         String last = null;
         while (number.find()) {
-            last = number.group();
+            last = number.group(1);
         }
         return last != null ? new PipeValue.Numeric(last) : new PipeValue.Text(text.strip());
     }

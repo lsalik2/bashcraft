@@ -10,15 +10,19 @@ import java.util.regex.Pattern;
 final class OutputAdapters {
     private static final Pattern NBT_NUMBER = Pattern.compile("(-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?)[bBsSlLfFdD]?");
 
-    private static final Map<String, Function<Feedback, Optional<PipeValue>>> ADAPTERS = Map.of(
-            "commands.locate.structure.success", OutputAdapters::coordinates,
-            "commands.locate.biome.success", OutputAdapters::coordinates,
-            "commands.locate.poi.success", OutputAdapters::coordinates,
-            "commands.data.entity.query", f -> data(f, 1),
-            "commands.data.block.query", f -> data(f, 3),
-            "commands.data.storage.query", f -> data(f, 1),
-            "commands.time.query", f -> numeric(f, 0),
-            "commands.scoreboard.players.get.success", f -> numeric(f, 1));
+    private static final Map<String, Function<Feedback, Optional<PipeValue>>> ADAPTERS = Map.ofEntries(
+            Map.entry("commands.locate.structure.success", OutputAdapters::coordinates),
+            Map.entry("commands.locate.biome.success", OutputAdapters::coordinates),
+            Map.entry("commands.locate.poi.success", OutputAdapters::coordinates),
+            Map.entry("commands.data.entity.query", f -> data(f, 1)),
+            Map.entry("commands.data.block.query", f -> data(f, 3)),
+            Map.entry("commands.data.storage.query", f -> data(f, 1)),
+            Map.entry("commands.time.query", f -> numeric(f, 0)),
+            Map.entry("commands.time.query.gametime", f -> numeric(f, 0)),
+            Map.entry("commands.time.query.absolute", f -> numeric(f, 1)),
+            Map.entry("commands.time.query.timeline", f -> numeric(f, 1)),
+            Map.entry("commands.time.query.timeline.repetitions", f -> numeric(f, 1)),
+            Map.entry("commands.scoreboard.players.get.success", f -> numeric(f, 1)));
 
     private OutputAdapters() {}
 

@@ -19,6 +19,7 @@ class BashcraftConfigTest {
         assertTrue(config.transparentMode);
         assertEquals(32, config.maxSegments);
         assertEquals(8, config.maxDepth);
+        assertEquals(256, config.maxTotalCommands);
         assertTrue(config.swallowPipedOutput);
         assertTrue(Files.readString(file).contains("\"maxSegments\": 32"));
         assertSame(config, BashcraftConfig.get());

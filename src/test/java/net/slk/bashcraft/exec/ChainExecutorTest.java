@@ -119,6 +119,39 @@ class ChainExecutorTest {
     }
 
     @Test
+    void pipeCarriesZeroAndNegativeResults() throws Exception {
+        Feedback score = Feedback.translatable("commands.scoreboard.players.get.success", "n has -1040 [bc]", "n", -1040, Feedback.plain("[bc]"));
+        FakeRunner r = new FakeRunner().on("scoreboard players get n bc", new ExecResult(false, false, -1040, List.of(score)));
+        run(r, "scoreboard players get n bc | setblock {value} 120 0 minecraft:stone");
+        assertEquals(List.of("scoreboard players get n bc", "setblock -1040 120 0 minecraft:stone"), r.ran);
+    }
+
+    @Test
+    void zeroResultStillFailsForAnd() throws Exception {
+        FakeRunner r = new FakeRunner().on("a", new ExecResult(false, false, 0, List.of(Feedback.plain("0"))));
+        assertFalse(run(r, "a && b").success());
+        assertEquals(List.of("a"), r.ran);
+    }
+
+    @Test
+    void nestedChainsShareACommandBudget() throws Exception {
+        try (DepthGuard.Scope outer = DepthGuard.enter(8).orElseThrow()) {
+            FakeRunner r = new FakeRunner();
+            new ChainExecutor(r, true, 3).execute(ChainParser.parse("a ; b", ChainParser.Mode.SH, 32));
+            try (DepthGuard.Scope inner = DepthGuard.enter(8).orElseThrow()) {
+                new ChainExecutor(r, true, 3).execute(ChainParser.parse("c ; d", ChainParser.Mode.SH, 32));
+            }
+            assertEquals(List.of("a", "b", "c"), r.ran);
+            assertEquals(List.of("[2] too many commands across nested chains (max 3)"), r.errors);
+        }
+        try (DepthGuard.Scope next = DepthGuard.enter(8).orElseThrow()) {
+            FakeRunner r = new FakeRunner();
+            new ChainExecutor(r, true, 3).execute(ChainParser.parse("a ; b ; c", ChainParser.Mode.SH, 32));
+            assertEquals(List.of("a", "b", "c"), r.ran, "the budget resets when the outermost chain ends");
+        }
+    }
+
+    @Test
     void missingPlaceholderIsReported() throws Exception {
         FakeRunner r = new FakeRunner().on("time query gametime",
                 new ExecResult(true, 50, List.of(Feedback.translatable("commands.time.query", "The time is 50", 50))));

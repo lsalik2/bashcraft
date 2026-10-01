@@ -48,8 +48,19 @@ class PipeResolverTest {
     }
 
     @Test
-    void timeQuery() throws Exception {
-        assertEquals(new PipeValue.Numeric("1234"), resolve(Feedback.translatable("commands.time.query", "The time is 1234", 1234)));
+    void timeQueryGametime() throws Exception {
+        assertEquals(new PipeValue.Numeric("1234"),
+                resolve(Feedback.translatable("commands.time.query.gametime", "Die Spielzeit ist 1234 Ticks und 5", 1234)));
+    }
+
+    @Test
+    void timeQueryClockAndTimelineUseSecondArgument() throws Exception {
+        assertEquals(new PipeValue.Numeric("600"),
+                resolve(Feedback.translatable("commands.time.query.absolute", "Uhr minecraft:overworld 600 7", "minecraft:overworld", 600)));
+        assertEquals(new PipeValue.Numeric("42"),
+                resolve(Feedback.translatable("commands.time.query.timeline", "x 42 y 9", "minecraft:day", 42)));
+        assertEquals(new PipeValue.Numeric("3"),
+                resolve(Feedback.translatable("commands.time.query.timeline.repetitions", "x 3 y 9", "minecraft:day", 3)));
     }
 
     @Test
@@ -66,6 +77,13 @@ class PipeResolverTest {
     @Test
     void fallbackTakesLastNumber() throws Exception {
         assertEquals(new PipeValue.Numeric("20"), resolve(Feedback.plain("There are 3 of a max of 20 players online")));
+    }
+
+    @Test
+    void fallbackKeepsNbtSuffixedDecimals() throws Exception {
+        assertEquals(new PipeValue.Numeric("20.0"), resolve(Feedback.plain("Health is 20.0f")));
+        assertEquals(new PipeValue.Numeric("-0.5"), resolve(Feedback.plain("Offset -0.5d applied")));
+        assertEquals(new PipeValue.Numeric("20"), resolve(Feedback.plain("There are 20 players online.")));
     }
 
     @Test

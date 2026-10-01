@@ -22,6 +22,8 @@ public final class BashcraftConfig {
     public int maxSegments = 32;
     /** Max nesting of chains inside chains (e.g. through functions). */
     public int maxDepth = 8;
+    /** Max commands run by one chain including every chain nested inside it (stops function fork-bombs). */
+    public int maxTotalCommands = 256;
     /** Hide success messages of commands that feed a pipe. */
     public boolean swallowPipedOutput = true;
 
@@ -48,6 +50,7 @@ public final class BashcraftConfig {
         }
         config.maxSegments = Math.max(1, config.maxSegments);
         config.maxDepth = Math.max(1, config.maxDepth);
+        config.maxTotalCommands = Math.max(1, config.maxTotalCommands);
         instance = config;
         return config;
     }
