@@ -28,7 +28,7 @@ focus, so it must work from **chat, server console, command blocks, and `.mcfunc
 | Fabric Loader | 0.19.5 |
 | Fabric API / Loom | Latest builds for 26.3 — pinned in the implementation plan |
 | Mappings | None — Minecraft 26.x ships unobfuscated; code uses Mojang names (Yarn ends at 1.21.11) |
-| Java | Whatever 26.3 requires — confirmed in the plan. **No JDK is currently on PATH in the dev environment.** |
+| Java | JDK 25 at `~/.jdks/jdk-25.0.4.1+1` (not on PATH; build points Gradle at it). Required version for 26.3 confirmed in the plan. |
 | Side | Server-side only. Vanilla clients can connect and use it. |
 
 Single Minecraft version only; multi-version support is a future item.
