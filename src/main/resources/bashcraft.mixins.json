@@ -1,0 +1,9 @@
+{
+	"required": true,
+	"package": "net.slk.bashcraft.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

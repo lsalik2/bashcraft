@@ -1,0 +1,19 @@
+{
+	"schemaVersion": 1,
+	"id": "bashcraft",
+	"version": "${version}",
+	"name": "BashCraft",
+	"description": "Logical operators and pipes for Minecraft commands.",
+	"authors": ["SLK"],
+	"environment": "*",
+	"entrypoints": {
+		"main": ["net.slk.bashcraft.Bashcraft"]
+	},
+	"mixins": ["bashcraft.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
