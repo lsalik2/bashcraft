@@ -3,6 +3,8 @@
 	"package": "net.slk.bashcraft.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"CommandSourceStackAccessor",
+		"CommandSourceStackMixin",
 		"CommandsAccessor"
 	],
 	"injectors": {

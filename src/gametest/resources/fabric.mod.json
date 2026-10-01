@@ -6,7 +6,8 @@
 	"environment": "*",
 	"entrypoints": {
 		"fabric-client-gametest": [
-			"net.slk.bashcraft.test.BashcraftSmokeCheck"
+			"net.slk.bashcraft.test.BashcraftSmokeCheck",
+			"net.slk.bashcraft.test.BashcraftChainCheck"
 		]
 	},
 	"depends": {
