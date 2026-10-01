@@ -9,17 +9,20 @@ import java.util.List;
 
 /**
  * The CommandSource one chain segment runs with: forwards output to the invoker's source and
- * records success messages. {@code CommandSourceStackMixin} feeds {@link #capture} and applies {@link RunOptions}.
+ * records success messages. {@code CommandSourceStackMixin} feeds {@link #capture} and numbers failures.
  */
 public final class TeeSource implements CommandSource {
     private final CommandSource target;
     private final RunOptions options;
     private final List<Component> captured = new ArrayList<>();
-    private boolean failed;
 
     public TeeSource(CommandSource target, RunOptions options) {
         this.target = target;
         this.options = options;
+    }
+
+    public CommandSource target() {
+        return target;
     }
 
     public RunOptions options() {
@@ -34,23 +37,15 @@ public final class TeeSource implements CommandSource {
         captured.add(message);
     }
 
-    /** Whether the segment sent a failure message (shown or not). */
-    public boolean failed() {
-        return failed;
-    }
-
-    public void markFailed() {
-        failed = true;
-    }
-
     @Override
     public void sendSystemMessage(Component message) {
         target.sendSystemMessage(message);
     }
 
+    /** Piped segments' success output is hidden from the invoker (it still reaches the admin broadcast and log). */
     @Override
     public boolean acceptsSuccess() {
-        return target.acceptsSuccess();
+        return !options.swallowSuccess() && target.acceptsSuccess();
     }
 
     @Override
