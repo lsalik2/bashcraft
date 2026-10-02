@@ -94,12 +94,12 @@ public final class ChainParser {
     }
 
     /** A quote opens a quoted span unless it follows a letter or digit (so "don't" stays plain text). */
-    private static boolean opensQuote(String input, int i) {
+    static boolean opensQuote(String input, int i) {
         return i == 0 || !Character.isLetterOrDigit(input.charAt(i - 1));
     }
 
     /** Index of the matching quote, skipping backslash-escaped characters; -1 if unclosed. */
-    private static int closingQuote(String input, int start) {
+    static int closingQuote(String input, int start) {
         char quote = input.charAt(start);
         for (int j = start + 1; j < input.length(); j++) {
             char c = input.charAt(j);
