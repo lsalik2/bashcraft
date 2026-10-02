@@ -45,14 +45,19 @@ public final class ShCommand {
 
     /** Parses and runs a chain as {@code source}; returns the last segment's outcome (a failure for parse or limit errors). */
     public static ExecResult run(CommandSourceStack source, String input) {
-        BashcraftConfig config = BashcraftConfig.get();
         Chain chain;
         try {
-            chain = ChainParser.parse(input, ChainParser.Mode.SH, config.maxSegments);
+            chain = ChainParser.parse(input, ChainParser.Mode.SH, BashcraftConfig.get().maxSegments);
         } catch (ChainSyntaxException e) {
             source.sendFailure(Component.literal("BashCraft: " + e.getMessage()));
             return ExecResult.failure();
         }
+        return execute(source, chain);
+    }
+
+    /** Runs an already-parsed chain as {@code source} (used by /sh and by transparent mode). */
+    public static ExecResult execute(CommandSourceStack source, Chain chain) {
+        BashcraftConfig config = BashcraftConfig.get();
         Optional<DepthGuard.Scope> scope = DepthGuard.enter(config.maxDepth);
         if (scope.isEmpty()) {
             source.sendFailure(Component.literal("BashCraft: chains nested deeper than " + config.maxDepth));

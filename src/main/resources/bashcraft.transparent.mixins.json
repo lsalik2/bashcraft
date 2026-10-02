@@ -1,0 +1,12 @@
+{
+	"required": false,
+	"package": "net.slk.bashcraft.mixin.transparent",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"CommandsTransparentMixin",
+		"ServerFunctionLibraryMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}

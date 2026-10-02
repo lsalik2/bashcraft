@@ -9,7 +9,7 @@
 	"entrypoints": {
 		"main": ["net.slk.bashcraft.Bashcraft"]
 	},
-	"mixins": ["bashcraft.mixins.json"],
+	"mixins": ["bashcraft.mixins.json", "bashcraft.transparent.mixins.json"],
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~26.3",

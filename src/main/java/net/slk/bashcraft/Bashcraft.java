@@ -1,9 +1,11 @@
 package net.slk.bashcraft;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.slk.bashcraft.command.ShCommand;
 import net.slk.bashcraft.config.BashcraftConfig;
+import net.slk.bashcraft.mc.TransparentHooks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +17,11 @@ public class Bashcraft implements ModInitializer {
     public void onInitialize() {
         BashcraftConfig.load(FabricLoader.getInstance().getConfigDir().resolve("bashcraft.json"));
         ShCommand.register();
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> {
+            if (BashcraftConfig.get().transparentMode && !TransparentHooks.applied()) {
+                LOGGER.warn("BashCraft: transparent mode hooks did not apply to this Minecraft version; use /sh instead");
+            }
+        });
         LOGGER.info("BashCraft loaded");
     }
 }
