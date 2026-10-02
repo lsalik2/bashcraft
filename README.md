@@ -45,8 +45,11 @@ Chains also work typed directly, as long as every command after an operator star
 ```
 
 `/say lunch; then work` is still a plain `/say` (no `/` after the `;`). This works in chat, the console, command
-blocks and function files (`say hi && /say there`, macro lines too). A vanilla client may colour such a line red;
-it is still sent. Set `transparentMode` to `false` to turn this off; `/sh` always works.
+blocks and function files (`say hi && /say there`). A vanilla client may colour such a line red; it is still sent.
+Set `transparentMode` to `false` to turn this off (function files pick up the change on `/reload`); `/sh` always works.
+
+Macro lines (`$…`) in functions are never chained: a macro value could otherwise add commands to the line. Writing
+`$sh …` yourself is possible, but then any `;`, `|` or `&&` inside a substituted value counts as an operator.
 
 ## Config
 

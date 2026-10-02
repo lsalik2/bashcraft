@@ -35,8 +35,8 @@ public class BashcraftTransparentCheck implements FabricClientGameTest {
 
             server.runCommand("function bashcraft-test:transparent");
             check(stone(server, 4, 6) && stone(server, 5, 6), "function files chain without sh");
-            server.runCommand("function bashcraft-test:transparent_macro {x:6}");
-            check(stone(server, 6, 6) && stone(server, 7, 6), "macro function lines chain without sh");
+            server.runCommand("function bashcraft-test:transparent_macro {msg:\"x ; setblock 6 120 6 minecraft:stone\"}");
+            check(!stone(server, 6, 6) && !stone(server, 7, 6), "macro lines aren't chained, so a macro value can't add commands");
 
             server.runCommand("scoreboard players set n bc 9");
             server.runCommand("scoreboard players get n bc | /setblock {value} 120 7 minecraft:stone");
@@ -62,6 +62,14 @@ public class BashcraftTransparentCheck implements FabricClientGameTest {
             context.waitTicks(5);
             server.runCommand("execute if score @p t2 matches 7 run setblock 0 120 7 minecraft:stone");
             check(!stone(server, 0, 7), "transparent chat refuses chat commands that need signing");
+
+            // A function the player runs has the player's source but suppressed output; its chat commands aren't the player's chat.
+            // /op is dedicated-server only; grant op through the player list.
+            server.runOnServer(s -> s.getPlayerList().op(s.getPlayerList().getPlayers().getFirst().nameAndId()));
+            context.runOnClient(client -> client.getConnection().sendCommand("function bashcraft-test:say_chain"));
+            context.waitTicks(5);
+            server.runOnServer(s -> s.getPlayerList().deop(s.getPlayerList().getPlayers().getFirst().nameAndId()));
+            check(stone(server, 9, 8), "a function run by a player can chain say");
 
             server.runOnServer(s -> BashcraftConfig.get().transparentMode = false);
             server.runCommand("setblock 0 120 8 minecraft:stone && /setblock 1 120 8 minecraft:stone");

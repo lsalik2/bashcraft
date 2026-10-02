@@ -36,14 +36,16 @@ public final class FunctionLines {
         return out;
     }
 
-    /** The rewritten line, or null to keep the original. */
+    /**
+     * The rewritten line, or null to keep the original. Macro lines ({@code $…}) are never chained: their values are
+     * substituted after load and would be re-parsed as part of the chain, so a value could add commands.
+     */
     private static String rewriteLine(String line, int maxSegments) {
-        if (line.isEmpty() || line.startsWith("#") || line.startsWith("/")) {
+        if (line.isEmpty() || line.startsWith("#") || line.startsWith("/") || line.startsWith("$")) {
             return null;
         }
-        boolean macro = line.startsWith("$");
-        Optional<Chain> chain = TransparentChains.detect(macro ? line.substring(1) : line, maxSegments);
-        return chain.map(c -> (macro ? "$sh " : "sh ") + ChainFormatter.toSh(c)).orElse(null);
+        Optional<Chain> chain = TransparentChains.detect(line, maxSegments);
+        return chain.map(c -> "sh " + ChainFormatter.toSh(c)).orElse(null);
     }
 
     private static boolean endsWithBackslash(CharSequence line) {

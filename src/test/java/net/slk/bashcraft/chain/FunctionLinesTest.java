@@ -23,9 +23,10 @@ class FunctionLinesTest {
     }
 
     @Test
-    void macroLinesKeepTheirDollar() {
-        assertEquals(List.of("$sh setblock $(x) 120 6 minecraft:stone && setblock 7 120 6 minecraft:stone"),
-                rewrite("$setblock $(x) 120 6 minecraft:stone && /setblock 7 120 6 minecraft:stone"));
+    void macroLinesAreNotRewritten() {
+        // Substituted values would be re-parsed as part of the chain, so a value could add commands.
+        List<String> lines = List.of("$say $(msg) && /setblock 7 120 6 minecraft:stone");
+        assertEquals(lines, FunctionLines.rewrite(lines, 32));
     }
 
     @Test
