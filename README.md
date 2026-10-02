@@ -18,6 +18,19 @@ Fabric, Minecraft 26.3, server-side (vanilla clients can use it).
 | `a ; b` | always run `b` |
 | `a \| b` | feed a value from `a`'s output into `b` |
 
+### Without `/sh`
+
+Chains also work typed directly, as long as every command after an operator starts with `/`:
+
+```
+/tp @s ~ ~ ~ && /summon minecraft:zombie
+/locate structure #minecraft:village | /tp @s {x} 150 {z}
+```
+
+`/say lunch; then work` is still a plain `/say` (no `/` after the `;`). This works in chat, the console, command
+blocks and function files (`say hi && /say there`, macro lines too). A vanilla client may colour such a line red;
+it is still sent. Set `transparentMode` to `false` to turn this off; `/sh` always works.
+
 Success means the command didn't error and returned more than 0 (the command-block rule). A function without
 `return` counts as success if it ran, even when a line inside it failed (as in vanilla). `/sh` reports the chain's
 result to command blocks and `/execute store`, so a failed chain has SuccessCount 0.
@@ -39,7 +52,7 @@ not the function around the `sh` line.
 
 `config/bashcraft.json`: `maxSegments` (32), `maxDepth` (8), `maxTotalCommands` (256, across nested chains),
 `swallowPipedOutput` (true),
-`transparentMode` (true; used by the upcoming prefix-free mode).
+`transparentMode` (true).
 
 ## Building
 
