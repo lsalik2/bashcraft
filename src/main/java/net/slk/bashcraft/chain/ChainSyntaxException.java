@@ -13,4 +13,10 @@ public class ChainSyntaxException extends Exception {
     public int column() {
         return column;
     }
+
+    /** Vanilla-style context line: up to 10 characters of input before the error, then {@code <--[HERE]}. */
+    public String context(String input) {
+        int cursor = Math.min(input.length(), Math.max(0, column - 1));
+        return (cursor > 10 ? "..." : "") + input.substring(Math.max(0, cursor - 10), cursor) + "<--[HERE]";
+    }
 }
