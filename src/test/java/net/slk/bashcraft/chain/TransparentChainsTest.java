@@ -8,14 +8,14 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TransparentChainsTest {
-    private static Optional<Chain> detect(String line) {
+    private static Optional<Node> detect(String line) {
         return TransparentChains.detect(line, 32);
     }
 
     @Test
     void slashFollowedOperatorsMakeAChain() {
-        Chain chain = detect("tp @s ~ ~ ~ && /summon minecraft:zombie").orElseThrow();
-        assertEquals(List.of(new Pipeline(List.of("tp @s ~ ~ ~")), new Pipeline(List.of("summon minecraft:zombie"))), chain.pipelines());
+        assertEquals(List.of(List.of("tp @s ~ ~ ~"), List.of("summon minecraft:zombie")),
+                Flat.commands(detect("tp @s ~ ~ ~ && /summon minecraft:zombie").orElseThrow()));
     }
 
     @Test
@@ -23,6 +23,13 @@ class TransparentChainsTest {
         assertTrue(detect("say lunch; then work").isEmpty());
         assertTrue(detect("say a && b").isEmpty());
         assertTrue(detect("tp @s ~ ~ ~").isEmpty());
+        assertTrue(detect("say (hi) && b").isEmpty());
+    }
+
+    @Test
+    void groupsMakeAChainEvenWithOneCommand() {
+        assertEquals(new Node.Group(new Node.Command("say hi")), detect("(/say hi)").orElseThrow());
+        assertTrue(detect("/(/a || /b) && /c").isPresent());
     }
 
     @Test
@@ -35,6 +42,7 @@ class TransparentChainsTest {
     void unparseableLinesGoToVanilla() {
         assertTrue(detect("say \"oops && /say b").isEmpty());
         assertTrue(detect("say a && /").isEmpty());
+        assertTrue(detect("(/a && /b").isEmpty());
         assertTrue(TransparentChains.detect("a ; /b ; /c", 2).isEmpty());
     }
 }

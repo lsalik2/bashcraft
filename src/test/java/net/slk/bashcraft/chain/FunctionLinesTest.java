@@ -45,4 +45,10 @@ class FunctionLinesTest {
         List<String> lines = List.of("say a && \\", "/say b \\");
         assertEquals(lines, FunctionLines.rewrite(lines, 32));
     }
+
+    @Test
+    void groupLinesBecomeShLines() {
+        assertEquals(List.of("sh (say a ; say b) && say c"), rewrite("(say a ; /say b) && /say c"));
+        assertEquals(List.of("sh (say a || say b) && say c", ""), rewrite("(say a || \\", "/say b) && /say c"));
+    }
 }

@@ -7,10 +7,10 @@ public final class TransparentChains {
     private TransparentChains() {}
 
     /**
-     * The chain in {@code line} if it has more than one command. Empty for plain vanilla lines, for {@code sh} lines
-     * (the command handles those) and for lines that don't parse as a chain — those go to vanilla untouched.
+     * The chain in {@code line} if it has more than one command or any group. Empty for plain vanilla lines, for
+     * {@code sh} lines (the command handles those) and for lines that don't parse — those go to vanilla untouched.
      */
-    public static Optional<Chain> detect(String line, int maxSegments) {
+    public static Optional<Node> detect(String line, int maxSegments) {
         String command = line.strip();
         if (command.startsWith("/")) {
             command = command.substring(1);
@@ -19,8 +19,8 @@ public final class TransparentChains {
             return Optional.empty();
         }
         try {
-            Chain chain = ChainParser.parse(line, ChainParser.Mode.TRANSPARENT, maxSegments);
-            return chain.segmentCount() > 1 ? Optional.of(chain) : Optional.empty();
+            Node node = NodeParser.parse(line, NodeParser.Mode.TRANSPARENT, maxSegments);
+            return node.commandCount() > 1 || node.containsGroup() ? Optional.of(node) : Optional.empty();
         } catch (ChainSyntaxException e) {
             return Optional.empty();
         }

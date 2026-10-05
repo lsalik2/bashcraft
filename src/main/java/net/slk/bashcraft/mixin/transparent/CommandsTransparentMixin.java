@@ -3,7 +3,6 @@ package net.slk.bashcraft.mixin.transparent;
 import com.mojang.brigadier.ParseResults;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.slk.bashcraft.chain.Chain;
 import net.slk.bashcraft.chain.TransparentChains;
 import net.slk.bashcraft.command.ShCommand;
 import net.slk.bashcraft.config.BashcraftConfig;
@@ -26,7 +25,7 @@ public abstract class CommandsTransparentMixin {
         if (!config.transparentMode || ((CommandSourceStackAccessor) source).bashcraft$source() instanceof TeeSource) {
             return;
         }
-        TransparentChains.detect(command, config.maxSegments).map(Chain::toNode).ifPresent(chain -> {
+        TransparentChains.detect(command, config.maxSegments).ifPresent(chain -> {
             ci.cancel();
             ExecResult result = ShCommand.execute(source, chain);
             source.callback().onResult(result.success(), result.success() ? result.result() : 0);

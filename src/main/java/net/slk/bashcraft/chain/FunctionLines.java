@@ -44,7 +44,7 @@ public final class FunctionLines {
         if (line.isEmpty() || line.startsWith("#") || line.startsWith("/") || line.startsWith("$")) {
             return null;
         }
-        Optional<Chain> chain = TransparentChains.detect(line, maxSegments);
+        Optional<Node> chain = TransparentChains.detect(line, maxSegments);
         return chain.map(c -> "sh " + ChainFormatter.toSh(c)).orElse(null);
     }
 
