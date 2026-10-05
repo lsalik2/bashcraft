@@ -27,13 +27,24 @@ or text, and append them to the next command — or put them where you write `{x
 `{result}` is the previous command's numeric result. Zero and negative values pipe like any other. `/locate` reports Y as `~`, so `| tp @s` keeps your height;
 use `tp @s {x} 120 {z}` to choose one.
 
-**Quoting:** `"…"` and `'…'` are never split; `\&&`, `\|`, `\;` are literal; `\{x}` is a literal `{x}`.
+**Quoting:** `"…"` and `'…'` are never split; `\&&`, `\|`, `\;`, `\(`, `\)` are literal; `\{x}` is a literal `{x}`.
 A quote right after a letter or digit doesn't start a quoted span, so `don't` is plain text.
 
 Works in chat, the console, command blocks and functions (write `sh …` in `.mcfunction` files).
 Chains never grant extra permissions. When a player types `/sh`, chat commands (`msg`, `me`, `say`, `teammsg`)
 are refused inside it, because their messages couldn't be signed. `return` inside a segment ends only that segment,
 not the function around the `sh` line.
+
+**Groups:** `( … )` groups commands, and groups nest:
+
+```
+/sh (setblock ~ ~ ~ stone || setblock ~1 ~ ~ stone) && say placed
+/(/locate structure #minecraft:village || /locate structure #minecraft:pillager_outpost) | /tp @s {x} 150 {z}
+```
+
+A group's result — and its output, when piped — is that of the last command that ran in it. A value piped into a
+group goes to its first command. `(` only opens a group where a command could start; elsewhere it's text, as in
+`say (hi)`. Inside a group, a `)` without a matching `(` in the same command must be written `\)`.
 
 ### Without `/sh`
 
@@ -43,6 +54,8 @@ Chains also work typed directly, as long as every command after an operator star
 /tp @s ~ ~ ~ && /summon minecraft:zombie
 /locate structure #minecraft:village | /tp @s {x} 150 {z}
 ```
+
+A line can also start with a group: `/(/a || /b) && /c`.
 
 `/say lunch; then work` is still a plain `/say` (no `/` after the `;`). This works in chat, the console, command
 blocks and function files (`say hi && /say there`). A vanilla client may colour such a line red; it is still sent.

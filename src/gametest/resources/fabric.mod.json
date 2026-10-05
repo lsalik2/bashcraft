@@ -8,7 +8,8 @@
 		"fabric-client-gametest": [
 			"net.slk.bashcraft.test.BashcraftSmokeCheck",
 			"net.slk.bashcraft.test.BashcraftChainCheck",
-			"net.slk.bashcraft.test.BashcraftTransparentCheck"
+			"net.slk.bashcraft.test.BashcraftTransparentCheck",
+			"net.slk.bashcraft.test.BashcraftGroupCheck"
 		]
 	},
 	"depends": {
