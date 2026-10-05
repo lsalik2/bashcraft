@@ -57,9 +57,12 @@ The tokenizer turns the input into **text runs** and **operators** (`&&`, `||`, 
 - **Group open.** `(` opens a group only at a *command position*: the start of the input, or after an operator or
   another `(`, ignoring whitespace and an optional `/` before it. Anywhere else, `(` is text.
 - **Text parentheses.** Within a command's text, `(` and `)` are counted in pairs. A `)` closes the innermost open
-  group only when the command's text has no unmatched `(`. Outside any group an unmatched `)` is text (`say :)`).
-  Inside a group, an unmatched `)` in text must be written `\)`.
-- **Transparent mode** (no `/sh`): an operator counts only when the next non-space character is `/` or `(`. A line
+  group only when the command's text has no unmatched `(`. Outside any group an unmatched `)` is text (`say :)`),
+  unless the line has already used a group: then a stray `)` is an error ("unmatched ')', write \) for a literal
+  one"), because it most likely closed a group early. Inside a group, an unmatched `)` in text must be written `\)`.
+- **Transparent mode** (no `/sh`): an operator counts only when a slash command follows it, directly or as the
+  first thing inside one or more groups (`&& /b`, `&& (/b || /c)`, `&& /(…)`), so `say I love you && (hug)` stays
+  one vanilla command. *(Narrowed after review on 2026-10-06; the first wording accepted any `(`.)* A line
   whose first non-space characters are `(` or `/(` is parsed as a chain (no vanilla command starts with `(`).
   Typed in chat this is `/(/a || /b) && /c`, which the client sends as the command `(/a || /b) && /c`.
 

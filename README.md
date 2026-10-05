@@ -44,7 +44,8 @@ not the function around the `sh` line.
 
 A group's result — and its output, when piped — is that of the last command that ran in it. A value piped into a
 group goes to its first command. `(` only opens a group where a command could start; elsewhere it's text, as in
-`say (hi)`. Inside a group, a `)` without a matching `(` in the same command must be written `\)`.
+`say (hi)`. Inside a group, a `)` without a matching `(` in the same command must be written `\)`; once a line
+uses a group, a stray `)` anywhere in it is an error rather than text.
 
 ### Without `/sh`
 
@@ -55,7 +56,8 @@ Chains also work typed directly, as long as every command after an operator star
 /locate structure #minecraft:village | /tp @s {x} 150 {z}
 ```
 
-A line can also start with a group: `/(/a || /b) && /c`.
+A line can also start with a group: `/(/a || /b) && /c`. After an operator, a group counts only when a `/` command
+comes first inside it (`&& (/b || /c)`), so `/say I love you && (hug)` is still a plain `/say`.
 
 `/say lunch; then work` is still a plain `/say` (no `/` after the `;`). This works in chat, the console, command
 blocks and function files (`say hi && /say there`). A vanilla client may colour such a line red; it is still sent.
