@@ -1,6 +1,6 @@
 package net.slk.bashcraft.exec;
 
-import net.slk.bashcraft.chain.ChainParser;
+import net.slk.bashcraft.chain.NodeParser;
 import net.slk.bashcraft.pipe.Feedback;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +12,7 @@ class ChainExecutorTest {
     private static final ExecResult FAIL = ExecResult.failure();
 
     private static ExecResult run(FakeRunner runner, String chain) throws Exception {
-        return new ChainExecutor(runner, true).execute(ChainParser.parse(chain, ChainParser.Mode.SH, 32));
+        return new ChainExecutor(runner, true).execute(NodeParser.parse(chain, NodeParser.Mode.SH, 32));
     }
 
     private static Feedback locateVillage() {
@@ -87,7 +87,7 @@ class ChainExecutorTest {
         assertFalse(r.options.get(1).swallowSuccess());
 
         FakeRunner shown = new FakeRunner().on("a", new ExecResult(true, 1, List.of(Feedback.plain("5"))));
-        new ChainExecutor(shown, false).execute(ChainParser.parse("a | b", ChainParser.Mode.SH, 32));
+        new ChainExecutor(shown, false).execute(NodeParser.parse("a | b", NodeParser.Mode.SH, 32));
         assertFalse(shown.options.get(0).swallowSuccess());
     }
 
@@ -137,16 +137,16 @@ class ChainExecutorTest {
     void nestedChainsShareACommandBudget() throws Exception {
         try (DepthGuard.Scope outer = DepthGuard.enter(8).orElseThrow()) {
             FakeRunner r = new FakeRunner();
-            new ChainExecutor(r, true, 3).execute(ChainParser.parse("a ; b", ChainParser.Mode.SH, 32));
+            new ChainExecutor(r, true, 3).execute(NodeParser.parse("a ; b", NodeParser.Mode.SH, 32));
             try (DepthGuard.Scope inner = DepthGuard.enter(8).orElseThrow()) {
-                new ChainExecutor(r, true, 3).execute(ChainParser.parse("c ; d", ChainParser.Mode.SH, 32));
+                new ChainExecutor(r, true, 3).execute(NodeParser.parse("c ; d", NodeParser.Mode.SH, 32));
             }
             assertEquals(List.of("a", "b", "c"), r.ran);
             assertEquals(List.of("[2] too many commands across nested chains (max 3)"), r.errors);
         }
         try (DepthGuard.Scope next = DepthGuard.enter(8).orElseThrow()) {
             FakeRunner r = new FakeRunner();
-            new ChainExecutor(r, true, 3).execute(ChainParser.parse("a ; b ; c", ChainParser.Mode.SH, 32));
+            new ChainExecutor(r, true, 3).execute(NodeParser.parse("a ; b ; c", NodeParser.Mode.SH, 32));
             assertEquals(List.of("a", "b", "c"), r.ran, "the budget resets when the outermost chain ends");
         }
     }
@@ -157,5 +157,54 @@ class ChainExecutorTest {
                 new ExecResult(true, 50, List.of(Feedback.translatable("commands.time.query", "The time is 50", 50))));
         assertFalse(run(r, "time query gametime | tp @s {x} 0 0").success());
         assertEquals(List.of("[2] {x} is not available from a number"), r.errors);
+    }
+
+    @Test
+    void groupStatusDrivesTheNextOperator() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, "(a || b) && c");
+        assertEquals(List.of("a", "c"), r.ran);
+
+        FakeRunner failing = new FakeRunner().on("b", FAIL);
+        run(failing, "(a && b) || c");
+        assertEquals(List.of("a", "b", "c"), failing.ran);
+    }
+
+    @Test
+    void skippedGroupDoesNotRun() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, "a || (b ; c)");
+        assertEquals(List.of("a"), r.ran);
+    }
+
+    @Test
+    void groupPipesItsLastCommandsOutput() throws Exception {
+        FakeRunner r = new FakeRunner()
+                .on("locate structure #minecraft:nope", FAIL)
+                .on("locate structure #minecraft:village", new ExecResult(true, 845, List.of(locateVillage())));
+        run(r, "(locate structure #minecraft:nope || locate structure #minecraft:village) | tp @s");
+        assertEquals(List.of("locate structure #minecraft:nope", "locate structure #minecraft:village", "tp @s 312 ~ -1040"), r.ran);
+    }
+
+    @Test
+    void pipingIntoAGroupReachesOnlyItsFirstCommand() throws Exception {
+        FakeRunner r = new FakeRunner().on("a", new ExecResult(true, 5, List.of(Feedback.plain("5"))));
+        run(r, "a | (b ; c)");
+        assertEquals(List.of("a", "b 5", "c"), r.ran);
+    }
+
+    @Test
+    void numberingAndHiddenOutputAcrossGroups() throws Exception {
+        FakeRunner r = new FakeRunner().on("b", new ExecResult(true, 1, List.of(Feedback.plain("5"))));
+        run(r, "(a ; b) | c");
+        assertEquals(List.of("[1] ", "[2] ", "[3] "), r.options.stream().map(RunOptions::failurePrefix).toList());
+        assertEquals(List.of(true, true, false), r.options.stream().map(RunOptions::swallowSuccess).toList());
+    }
+
+    @Test
+    void nothingToPipeFromAGroupNamesItsLastCommand() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, "(x ; a) | b");
+        assertEquals(List.of("[3] nothing to pipe from /a"), r.errors);
     }
 }

@@ -3,14 +3,15 @@ package net.slk.bashcraft.command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.ContextChain;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.execution.ChainModifiers;
 import net.minecraft.commands.execution.CustomCommandExecutor;
 import net.minecraft.commands.execution.ExecutionControl;
 import net.minecraft.network.chat.Component;
-import net.slk.bashcraft.chain.Chain;
-import net.slk.bashcraft.chain.ChainParser;
+import net.slk.bashcraft.chain.Node;
+import net.slk.bashcraft.chain.NodeParser;
 import net.slk.bashcraft.chain.ChainSyntaxException;
 import net.slk.bashcraft.config.BashcraftConfig;
 import net.slk.bashcraft.exec.ChainExecutor;
@@ -45,18 +46,19 @@ public final class ShCommand {
 
     /** Parses and runs a chain as {@code source}; returns the last segment's outcome (a failure for parse or limit errors). */
     public static ExecResult run(CommandSourceStack source, String input) {
-        Chain chain;
+        Node chain;
         try {
-            chain = ChainParser.parse(input, ChainParser.Mode.SH, BashcraftConfig.get().maxSegments);
+            chain = NodeParser.parse(input, NodeParser.Mode.SH, BashcraftConfig.get().maxSegments);
         } catch (ChainSyntaxException e) {
             source.sendFailure(Component.literal("BashCraft: " + e.getMessage()));
+            source.sendFailure(Component.literal(e.context(input)).withStyle(ChatFormatting.GRAY));
             return ExecResult.failure();
         }
         return execute(source, chain);
     }
 
     /** Runs an already-parsed chain as {@code source} (used by /sh and by transparent mode). */
-    public static ExecResult execute(CommandSourceStack source, Chain chain) {
+    public static ExecResult execute(CommandSourceStack source, Node chain) {
         BashcraftConfig config = BashcraftConfig.get();
         Optional<DepthGuard.Scope> scope = DepthGuard.enter(config.maxDepth);
         if (scope.isEmpty()) {
