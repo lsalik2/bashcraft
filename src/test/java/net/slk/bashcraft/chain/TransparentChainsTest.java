@@ -24,6 +24,8 @@ class TransparentChainsTest {
         assertTrue(detect("say a && b").isEmpty());
         assertTrue(detect("tp @s ~ ~ ~").isEmpty());
         assertTrue(detect("say (hi) && b").isEmpty());
+        assertTrue(detect("say I love you && (hug)").isEmpty());
+        assertTrue(detect("msg Steve brb && (afk)").isEmpty());
     }
 
     @Test

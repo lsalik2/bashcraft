@@ -23,6 +23,7 @@ final class Tokenizer {
     private int textColumn = -1;
     private int textParens;
     private int groups;
+    private boolean usedGroups;
     private boolean commandStart = true;
 
     private Tokenizer(String input, NodeParser.Mode mode) {
@@ -77,6 +78,9 @@ final class Tokenizer {
                     appendText(")", i);
                 } else if (groups > 0) {
                     emit(Kind.CLOSE, ")", i);
+                } else if (usedGroups) {
+                    // Once the line uses groups, a stray ')' most likely closed a group early (a smiley inside it).
+                    throw new ChainSyntaxException("unmatched ')', write \\) for a literal one", i + 1);
                 } else {
                     appendText(")", i);
                 }
@@ -120,13 +124,16 @@ final class Tokenizer {
         return null;
     }
 
-    /** Transparent mode: an operator counts only when the next non-space character is '/' or '('. */
+    /**
+     * Transparent mode: an operator counts only when a slash command follows, directly or as the first thing inside
+     * one or more groups ({@code && /b}, {@code && (/b …)}, {@code && /(…)}). So {@code say hi && (hug)} stays text.
+     */
     private boolean nextIsCommandStart(int from) {
         int j = from;
-        while (j < input.length() && Character.isWhitespace(input.charAt(j))) {
+        while (j < input.length() && (Character.isWhitespace(input.charAt(j)) || input.charAt(j) == '(')) {
             j++;
         }
-        return j < input.length() && (input.charAt(j) == '/' || input.charAt(j) == '(');
+        return j < input.length() && input.charAt(j) == '/';
     }
 
     private void appendText(String s, int index) {
@@ -142,6 +149,7 @@ final class Tokenizer {
         textParens = 0;
         if (kind == Kind.OPEN) {
             groups++;
+            usedGroups = true;
         } else if (kind == Kind.CLOSE) {
             groups--;
         }

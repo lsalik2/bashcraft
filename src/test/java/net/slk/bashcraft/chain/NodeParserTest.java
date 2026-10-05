@@ -213,11 +213,33 @@ class NodeParserTest {
         assertEquals(expected, NodeParser.parse("(/a || /b) && /c", TRANSPARENT, 32));
         assertEquals(expected, NodeParser.parse("/(/a || /b) && /c", TRANSPARENT, 32));
         assertEquals(new Node.Sequence(List.of(cmd("say a"), new Node.Group(cmd("b"))), List.of(Operator.AND)),
-                NodeParser.parse("say a && (b)", TRANSPARENT, 32));
+                NodeParser.parse("say a && (/b)", TRANSPARENT, 32));
+        assertEquals(new Node.Sequence(List.of(cmd("say a"), new Node.Group(new Node.Group(cmd("b")))), List.of(Operator.AND)),
+                NodeParser.parse("say a && ( (/b))", TRANSPARENT, 32));
     }
 
     @Test
     void transparentTextParenthesesAreNotGroups() throws Exception {
         assertEquals(cmd("say (hi) && b"), NodeParser.parse("say (hi) && b", TRANSPARENT, 32));
+    }
+
+    @Test
+    void transparentParenthesesAfterAnOperatorNeedACommandInside() throws Exception {
+        assertEquals(cmd("say I love you && (hug)"), NodeParser.parse("say I love you && (hug)", TRANSPARENT, 32));
+        assertEquals(new Node.Sequence(List.of(cmd("tp @s 0 64 0"), cmd("say home ; (finally)")), List.of(Operator.AND)),
+                NodeParser.parse("tp @s 0 64 0 && /say home ; (finally)", TRANSPARENT, 32));
+    }
+
+    @Test
+    void strayCloseAfterAGroupIsAnError() {
+        ChainSyntaxException e = assertThrows(ChainSyntaxException.class, () -> sh("(say :) || b)"));
+        assertEquals("unmatched ')', write \\) for a literal one at col 13", e.getMessage());
+        assertThrows(ChainSyntaxException.class, () -> NodeParser.parse("(/say :) || /b)", TRANSPARENT, 32));
+    }
+
+    @Test
+    void smileysWithoutGroupsAreStillText() throws Exception {
+        assertEquals(new Node.Sequence(List.of(cmd("say :)"), cmd("say ;)")), List.of(Operator.AND)), sh("say :) && say \\;)"));
+        assertEquals(new Node.Group(new Node.Sequence(List.of(cmd("say :)"), cmd("b")), List.of(Operator.OR))), sh("(say :\\) || b)"));
     }
 }
