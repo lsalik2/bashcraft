@@ -1,0 +1,11 @@
+{
+	"required": false,
+	"package": "net.slk.bashcraft.mixin.client",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"CommandSuggestionsMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}
