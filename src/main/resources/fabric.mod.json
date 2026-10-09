@@ -7,7 +7,8 @@
 	"authors": ["SLK"],
 	"environment": "*",
 	"entrypoints": {
-		"main": ["net.slk.bashcraft.Bashcraft"]
+		"main": ["net.slk.bashcraft.Bashcraft"],
+		"client": ["net.slk.bashcraft.BashcraftClient"]
 	},
 	"mixins": ["bashcraft.mixins.json", "bashcraft.transparent.mixins.json"],
 	"depends": {
