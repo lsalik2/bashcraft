@@ -1,5 +1,6 @@
 package net.slk.bashcraft.pipe;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -22,7 +23,13 @@ final class OutputAdapters {
             Map.entry("commands.time.query.absolute", f -> numeric(f, 1)),
             Map.entry("commands.time.query.timeline", f -> numeric(f, 1)),
             Map.entry("commands.time.query.timeline.repetitions", f -> numeric(f, 1)),
-            Map.entry("commands.scoreboard.players.get.success", f -> numeric(f, 1)));
+            Map.entry("commands.scoreboard.players.get.success", f -> numeric(f, 1)),
+            Map.entry("commands.list.players", f -> list(f, 2)),
+            Map.entry("commands.tag.list.single.success", f -> list(f, 2)),
+            Map.entry("commands.tag.list.multiple.success", f -> list(f, 2)),
+            Map.entry("commands.team.list.members.success", f -> list(f, 2)),
+            Map.entry("commands.team.list.teams.success", f -> list(f, 1)),
+            Map.entry("commands.scoreboard.players.list.success", f -> list(f, 1)));
 
     private OutputAdapters() {}
 
@@ -38,6 +45,13 @@ final class OutputAdapters {
                 .map(c -> new PipeValue.Coordinates(c.argText(0).orElseThrow(), c.argText(1).orElseThrow(), c.argText(2).orElseThrow()));
     }
 
+    /** A ", "-joined list argument (ComponentUtils.formatList); empty text means no items. */
+    private static Optional<PipeValue> list(Feedback feedback, int index) {
+        return feedback.argText(index).map(text -> text.isEmpty()
+                ? new PipeValue.Items(List.of())
+                : new PipeValue.Items(List.of(text.split(", "))));
+    }
+
     private static Optional<PipeValue> numeric(Feedback feedback, int index) {
         return feedback.argText(index).map(PipeValue.Numeric::new);
     }
@@ -45,6 +59,10 @@ final class OutputAdapters {
     /** NBT numbers lose their type suffix; quoted strings lose their quotes; anything else is text. */
     private static Optional<PipeValue> data(Feedback feedback, int index) {
         return feedback.argText(index).map(String::strip).map(text -> {
+            Optional<List<String>> elements = NbtList.elements(text);
+            if (elements.isPresent()) {
+                return new PipeValue.Items(elements.get());
+            }
             Matcher m = NBT_NUMBER.matcher(text);
             if (m.matches()) {
                 return new PipeValue.Numeric(m.group(1));
