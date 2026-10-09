@@ -23,7 +23,11 @@ public final class ChainExecutor {
     /** Block coordinates beyond this are outside any Minecraft world. */
     private static final double WORLD_LIMIT = 29_999_984;
 
+    private static final java.util.regex.Pattern ALIAS_DEF =
+            java.util.regex.Pattern.compile("(global\\.)?([a-z_][a-z0-9_-]{0,31})\\s*=\\s*(.*)", java.util.regex.Pattern.DOTALL);
+
     private final CommandRunner runner;
+    private final ShellContext context;
     private final Variables variables;
     private final boolean swallowPipedOutput;
     private final int maxTotalCommands;
@@ -37,13 +41,18 @@ public final class ChainExecutor {
         this(runner, Variables.NONE, swallowPipedOutput, maxTotalCommands, Integer.MAX_VALUE);
     }
 
+    public ChainExecutor(CommandRunner runner, Variables variables, boolean swallowPipedOutput, int maxTotalCommands, int maxDepth) {
+        this(runner, ShellContext.of(variables), swallowPipedOutput, maxTotalCommands, maxDepth);
+    }
+
     /**
      * @param maxTotalCommands budget shared by this chain and every chain nested inside it (see {@link DepthGuard#spend})
-     * @param maxDepth         nesting limit for {@code $( … )}, shared with nested {@code sh}
+     * @param maxDepth         nesting limit for {@code $( … )}, aliases and nested {@code sh}
      */
-    public ChainExecutor(CommandRunner runner, Variables variables, boolean swallowPipedOutput, int maxTotalCommands, int maxDepth) {
+    public ChainExecutor(CommandRunner runner, ShellContext context, boolean swallowPipedOutput, int maxTotalCommands, int maxDepth) {
         this.runner = runner;
-        this.variables = variables;
+        this.context = context;
+        this.variables = context.variables();
         this.swallowPipedOutput = swallowPipedOutput;
         this.maxTotalCommands = maxTotalCommands;
         this.maxDepth = maxDepth;
@@ -89,9 +98,17 @@ public final class ChainExecutor {
         private boolean budgetExceeded;
         private boolean expansionFailed;
 
+        private final List<String> positionals;
+
         Run(Map<Node.Command, Integer> numbers, boolean numbered) {
+            this(numbers, numbered, null);
+        }
+
+        /** @param positionals the alias call's words while running an alias body, else null */
+        Run(Map<Node.Command, Integer> numbers, boolean numbered, List<String> positionals) {
             this.numbers = numbers;
             this.numbered = numbered;
+            this.positionals = positionals;
         }
 
         Outcome node(Node node, Piped input, boolean feedsPipe) {
@@ -144,13 +161,21 @@ public final class ChainExecutor {
             budgetExceeded = false;
             expansionFailed = false;
             Builtins.Call call = Builtins.classify(command.text());
+            if (call.kind() == Builtins.Kind.NONE) {
+                String word = command.text().split("\\s", 2)[0];
+                Optional<String> alias = context.aliases().body(word);
+                if (alias.isPresent()) {
+                    return finish(callAlias(command, word, alias.get(), input, feedsPipe), command);
+                }
+            }
             String text = call.argument();
-            if (call.kind() != Builtins.Kind.UNSET && call.kind() != Builtins.Kind.EACH) {
+            if (call.kind() != Builtins.Kind.UNSET && call.kind() != Builtins.Kind.EACH && call.kind() != Builtins.Kind.ALIAS
+                    && call.kind() != Builtins.Kind.UNALIAS) {
                 try {
                     boolean takesPipe = call.kind() != Builtins.Kind.GREP && call.kind() != Builtins.Kind.STORE
                             && call.kind() != Builtins.Kind.SURFACE;
                     Expander.Expansion expansion = Expander.expandParts(text, variables, lastStatus, this::substitute,
-                            input == null || !takesPipe ? null : new Expander.PipeInput(input.value(), input.result()));
+                            input == null || !takesPipe ? null : new Expander.PipeInput(input.value(), input.result()), positionals);
                     text = finalText(call, command.text(), expansion);
                 } catch (ExpansionException e) {
                     expansionFailed = true;
@@ -183,6 +208,9 @@ public final class ChainExecutor {
                 case GREP -> grep(command, text, input);
                 case STORE -> store(command, text, input, options);
                 case SURFACE -> surface(command, text, input, options);
+                case ALIAS -> alias(command, text, options);
+                case UNALIAS -> unalias(command, text);
+                case HISTORY -> history(command, options);
                 case EACH -> throw new IllegalStateException("each is handled above");
             };
             return finish(result, command);
@@ -400,7 +428,7 @@ public final class ChainExecutor {
                 }
                 Map<Node.Command, Integer> innerNumbers = new IdentityHashMap<>();
                 number(node, innerNumbers);
-                ExecResult result = new Run(innerNumbers, false).node(node, null, true).result();
+                ExecResult result = new Run(innerNumbers, false, positionals).node(node, null, true).result();
                 if (result.errored()) {
                     throw new ExpansionException("$(…) produced no value");
                 }
@@ -410,6 +438,111 @@ public final class ChainExecutor {
                     throw new ExpansionException("$(…) produced no value");
                 }
             }
+        }
+
+        /** Runs an alias body as a nested chain with the call's words as $1…$9/$@/$#; output shown as usual. */
+        private ExecResult callAlias(Node.Command command, String name, String body, Piped input, boolean feedsPipe) {
+            String rest = command.text().substring(name.length());
+            List<String> words;
+            try {
+                words = Words.split(Expander.expandParts(rest, variables, lastStatus, this::substitute, null, positionals).join(false));
+            } catch (ExpansionException e) {
+                expansionFailed = true;
+                runner.reportError(label(command) + e.getMessage());
+                return ExecResult.failure();
+            }
+            Node node;
+            try {
+                node = NodeParser.parse(body, NodeParser.Mode.SH, Integer.MAX_VALUE);
+            } catch (ChainSyntaxException e) {
+                runner.reportError(label(command) + "alias " + name + ": " + e.getMessage());
+                return ExecResult.failure();
+            }
+            if (!words.isEmpty() && !Expander.hasPositionals(body)) {
+                node = appendArguments(node);
+            }
+            Optional<DepthGuard.Scope> scope = DepthGuard.enter(maxDepth);
+            if (scope.isEmpty()) {
+                runner.reportError(label(command) + "aliases nested deeper than " + maxDepth);
+                return ExecResult.failure();
+            }
+            try (DepthGuard.Scope ignored = scope.get()) {
+                if (!DepthGuard.spend(maxTotalCommands)) {
+                    budgetExceeded = true;
+                    runner.reportError(label(command) + "too many commands across nested chains (max " + maxTotalCommands + ")");
+                    return ExecResult.failure();
+                }
+                Map<Node.Command, Integer> innerNumbers = new IdentityHashMap<>();
+                number(node, innerNumbers);
+                return new Run(innerNumbers, false, words).node(node, input, feedsPipe).result();
+            }
+        }
+
+        /** The append rule: the body's rightmost command gets " $@", so the words go in as values. */
+        private static Node appendArguments(Node node) {
+            return switch (node) {
+                case Node.Command command -> new Node.Command(command.text() + " $@");
+                case Node.Pipeline pipeline -> new Node.Pipeline(replaceLast(pipeline.stages()));
+                case Node.Sequence sequence -> new Node.Sequence(replaceLast(sequence.items()), sequence.joins());
+                case Node.Group group -> new Node.Group(appendArguments(group.body()));
+            };
+        }
+
+        private static List<Node> replaceLast(List<Node> nodes) {
+            List<Node> copy = new java.util.ArrayList<>(nodes);
+            copy.set(copy.size() - 1, appendArguments(copy.getLast()));
+            return copy;
+        }
+
+        /** alias (list) | alias NAME = BODY | alias global.NAME = BODY */
+        private ExecResult alias(Node.Command command, String arguments, RunOptions options) {
+            String text = arguments.strip();
+            if (text.isEmpty()) {
+                List<String> lines = context.aliases().listing();
+                lines.forEach(line -> runner.echo(line, options));
+                return new ExecResult(true, false, lines.size(), List.of(), new PipeValue.Items(lines));
+            }
+            java.util.regex.Matcher m = ALIAS_DEF.matcher(text);
+            if (!m.matches()) {
+                runner.reportError(label(command) + "alias needs NAME = BODY");
+                return ExecResult.failure();
+            }
+            String body = Builtins.unquote(m.group(3).strip());
+            try {
+                NodeParser.parse(body, NodeParser.Mode.SH, Integer.MAX_VALUE);
+            } catch (ChainSyntaxException e) {
+                runner.reportError(label(command) + "alias body: " + e.getMessage());
+                return ExecResult.failure();
+            }
+            try {
+                context.aliases().define(m.group(1) != null, m.group(2), body);
+                return new ExecResult(true, 1, List.of());
+            } catch (ExpansionException e) {
+                runner.reportError(label(command) + e.getMessage());
+                return ExecResult.failure();
+            }
+        }
+
+        private ExecResult unalias(Node.Command command, String arguments) {
+            String name = arguments.strip();
+            boolean global = name.startsWith("global.");
+            try {
+                context.aliases().remove(global, global ? name.substring(7) : name);
+                return new ExecResult(true, 1, List.of());
+            } catch (ExpansionException e) {
+                runner.reportError(label(command) + e.getMessage());
+                return ExecResult.failure();
+            }
+        }
+
+        private ExecResult history(Node.Command command, RunOptions options) {
+            if (context.history() == null) {
+                runner.reportError(label(command) + "history is only for chains you type");
+                return ExecResult.failure();
+            }
+            List<String> lines = context.history().lines();
+            lines.forEach(line -> runner.echo(line, options));
+            return new ExecResult(true, false, lines.size(), List.of(), new PipeValue.Items(lines));
         }
 
         private String label(Node.Command command) {

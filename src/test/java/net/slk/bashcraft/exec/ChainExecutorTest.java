@@ -613,4 +613,109 @@ class ChainExecutorTest {
         assertEquals(List.of("[2] surface: outside the world", "[4] surface: outside the world", "[6] surface: outside the world"), r.errors);
         assertTrue(r.surfaced.isEmpty(), "the runner must never be asked for an out-of-world column");
     }
+
+    private static ExecResult run(FakeRunner runner, ShellContext context, String chain, int maxDepth) throws Exception {
+        return new ChainExecutor(runner, context, true, Integer.MAX_VALUE, maxDepth).execute(NodeParser.parse(chain, NodeParser.Mode.SH, 32));
+    }
+
+    private static ShellContext typedShell(AliasTable aliases, History history) {
+        return new ShellContext(table(), aliases, history);
+    }
+
+    private static AliasTable aliases() {
+        return new AliasTable(new HashMap<>(), new HashMap<>(), true, true, name -> name.equals("tp"));
+    }
+
+    @Test
+    void defineAndCallAnAlias() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "alias home = tp @s 0 80 0 ; home", 8);
+        assertEquals(List.of("tp @s 0 80 0"), r.ran);
+    }
+
+    @Test
+    void aliasArgumentsAndDefaults() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null),
+                "alias heal = 'effect give $1 minecraft:regeneration 5 ${2:-1} && say healed $1' ; heal @s 3 ; heal @p", 8);
+        assertEquals(List.of("effect give @s minecraft:regeneration 5 3", "say healed @s",
+                "effect give @p minecraft:regeneration 5 1", "say healed @p"), r.ran);
+    }
+
+    @Test
+    void appendRuleAndCounts() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "alias g = gamemode ; g creative @s ; alias c = 'say $# $@' ; c a 'b c'", 8);
+        assertEquals(List.of("gamemode creative @s", "say 2 a b c"), r.ran);
+    }
+
+    @Test
+    void missingArgumentIsAnError() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "alias m = 'say $2' ; m a", 8);
+        assertEquals(List.of("$2 is not set"), r.errors);
+        assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void aliasDefinitionErrors() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "alias tp = say hi ; alias echo = say ; alias Bad = x ; alias b = 'say \"oops'", 8);
+        assertEquals(List.of("[1] alias name tp is already a command", "[2] alias name echo is already a command",
+                "[3] alias needs NAME = BODY", "[4] alias body: unclosed \" at col 5"), r.errors);
+    }
+
+    @Test
+    void elevatedChainsSeeOnlyGlobalAliases() throws Exception {
+        FakeRunner r = new FakeRunner();
+        AliasTable shared = new AliasTable(new HashMap<>(Map.of("home", "say mine")), new HashMap<>(Map.of("home", "say global")), false, true, name -> false);
+        run(r, new ShellContext(elevated(Map.of(), Map.of()), shared, null), "home", 8);
+        assertEquals(List.of("say global"), r.ran);
+    }
+
+    @Test
+    void recursiveAliasesStop() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "alias loop = loop ; loop", 3);
+        assertEquals("aliases nested deeper than 3", r.errors.getFirst());
+        assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void fanOutAliasesSpendTheBudget() throws Exception {
+        FakeRunner r = new FakeRunner();
+        new ChainExecutor(r, typedShell(aliases(), null), true, 50, 30)
+                .execute(NodeParser.parse("alias loop = 'loop ; loop ; loop ; loop' ; loop", NodeParser.Mode.SH, 32));
+        assertTrue(r.errors.stream().anyMatch(e -> e.contains("too many commands across nested chains (max 50)")), r.errors.toString());
+        assertTrue(r.errors.size() < 200, "stopped early: " + r.errors.size());
+    }
+
+    @Test
+    void listUnaliasAndPipeIntoAnAlias() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "alias a = say 1 ; alias global.b = say 2 ; alias ; unalias a ; a ; alias s = say ; echo 7 | s", 8);
+        assertEquals(List.of("a = say 1", "global.b = say 2", "7"), r.echoed);
+        assertEquals(List.of("a", "say 7"), r.ran);
+    }
+
+    @Test
+    void historyBuiltin() throws Exception {
+        History history = new History();
+        history.record("say hi");
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), history), "history", 8);
+        assertEquals(List.of("say hi"), r.echoed);
+        FakeRunner none = new FakeRunner();
+        run(none, typedShell(aliases(), null), "history", 8);
+        assertEquals(List.of("history is only for chains you type"), none.errors);
+    }
+
+    @Test
+    void aliasArgumentsInElevatedChainsMustBePlain() throws Exception {
+        FakeRunner r = new FakeRunner();
+        AliasTable shared = new AliasTable(new HashMap<>(), new HashMap<>(), false, true, name -> false);
+        run(r, new ShellContext(elevated(Map.of(), Map.of()), shared, null), "alias global.s = 'say $1' ; s 'a\"b'", 8);
+        assertTrue(r.errors.getFirst().contains("a value from a player can only be one plain word or a list of numbers here"), r.errors.toString());
+        assertTrue(r.ran.isEmpty());
+    }
 }
