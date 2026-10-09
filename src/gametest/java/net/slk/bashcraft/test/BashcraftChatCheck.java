@@ -51,6 +51,12 @@ public class BashcraftChatCheck implements FabricClientGameTest {
             context.waitTicks(2);
             check(context.computeOnClient(ChatProbe::isMessage), "a chat command anywhere in the chain marks the line as a message");
 
+            context.runOnClient(client -> ChatProbe.open(client, "/sh x=5 && setblock $x 64 $(scoreboard players get n bc) minecraft:stone"));
+            context.waitTicks(2);
+            check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)),
+                    "variables, substitutions and assignments are not shown as errors");
+            context.takeScreenshot("bashcraft-variables");
+
             context.runOnClient(client -> ChatProbe.open(client, "/tp @s ~ ~ ~"));
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "a vanilla line is unchanged");

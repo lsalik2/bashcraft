@@ -17,6 +17,8 @@ import net.slk.bashcraft.chain.ChainLayout;
 import net.slk.bashcraft.client.ChainStyles;
 import net.slk.bashcraft.client.ClientChains;
 import net.slk.bashcraft.client.ClientHooks;
+import net.slk.bashcraft.exec.Builtins;
+import net.slk.bashcraft.exec.Expander;
 import net.slk.bashcraft.pipe.Placeholders;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -85,7 +87,7 @@ public abstract class CommandSuggestionsMixin {
         }
         try {
             ChainLayout.Window window = layout.window(input.getCursorPosition());
-            StringReader command = new StringReader(Placeholders.mask(input.getValue().substring(0, window.end())));
+            StringReader command = new StringReader(Placeholders.mask(Expander.mask(input.getValue().substring(0, window.end()))));
             command.setCursor(window.start());
             return original.call(dispatcher, command, source);
         } catch (RuntimeException e) {
@@ -122,7 +124,7 @@ public abstract class CommandSuggestionsMixin {
     private CompletableFuture bashcraft$noSuggestionsAfterGroup(CommandDispatcher dispatcher, ParseResults parse, int cursor, Operation<CompletableFuture> original) {
         ChainLayout layout = bashcraft$layout;
         try {
-            if (layout != null && !layout.commandCanStartAt(cursor)) {
+            if (layout != null && (!layout.commandCanStartAt(cursor) || bashcraft$builtinAt(layout, cursor))) {
                 return Suggestions.empty();
             }
         } catch (RuntimeException e) {
@@ -135,6 +137,9 @@ public abstract class CommandSuggestionsMixin {
     @Inject(method = "updateUsageInfo", at = @At("TAIL"))
     private void bashcraft$chainError(ParseResults<ClientSuggestionProvider> parse, Suggestions suggestions, CallbackInfo ci) {
         ChainLayout layout = bashcraft$layout;
+        if (layout != null && bashcraft$builtinAt(layout, input.getCursorPosition())) {
+            commandUsage.clear();
+        }
         if (layout == null || layout.error().isEmpty()) {
             return;
         }
@@ -144,5 +149,14 @@ public abstract class CommandSuggestionsMixin {
         } catch (RuntimeException e) {
             ClientHooks.failed(e);
         }
+    }
+
+    /** Whether the command under the cursor is a BashCraft builtin (x=…, unset, echo), which vanilla can't parse. */
+    @Unique
+    private boolean bashcraft$builtinAt(ChainLayout layout, int cursor) {
+        ChainLayout.Window window = layout.window(cursor);
+        String value = input.getValue();
+        return window.start() < window.end()
+                && Builtins.classify(value.substring(window.start(), Math.min(window.end(), value.length())).strip()).kind() != Builtins.Kind.NONE;
     }
 }

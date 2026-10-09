@@ -8,6 +8,8 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
 import net.slk.bashcraft.chain.ChainLayout;
+import net.slk.bashcraft.exec.Builtins;
+import net.slk.bashcraft.exec.Expander;
 import net.slk.bashcraft.pipe.Placeholders;
 
 import java.util.ArrayList;
@@ -46,10 +48,13 @@ public final class ChainStyles {
         boolean hasMessages = false;
         Style[] styles = new Style[value.length()];
         Arrays.fill(styles, LITERAL);
-        String masked = Placeholders.mask(value);
+        String masked = Placeholders.mask(Expander.mask(value));
         for (ChainLayout.Span span : layout.spans()) {
             if (span.kind() != ChainLayout.Kind.COMMAND) {
                 fill(styles, span.start(), span.end(), SYNTAX);
+                continue;
+            }
+            if (Builtins.classify(value.substring(span.start(), span.end())).kind() != Builtins.Kind.NONE) {
                 continue;
             }
             StringReader reader = new StringReader(masked.substring(0, span.end()));
@@ -69,6 +74,11 @@ public final class ChainStyles {
         }
         for (int[] range : Placeholders.ranges(value)) {
             fill(styles, range[0], range[1], PLACEHOLDER);
+        }
+        for (Expander.Reference reference : Expander.scan(value)) {
+            if (reference.kind() != Expander.Kind.ESCAPED_DOLLAR && reference.kind() != Expander.Kind.BAD) {
+                fill(styles, reference.start(), reference.end(), PLACEHOLDER);
+            }
         }
         return new ChainStyles(value, styles, hasMessages);
     }
