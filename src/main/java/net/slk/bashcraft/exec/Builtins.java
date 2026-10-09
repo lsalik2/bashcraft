@@ -6,9 +6,9 @@ import java.util.regex.Pattern;
 
 /** Shell builtins recognised inside chains (spec C1 §4), on the command's text before expansion. */
 public final class Builtins {
-    public enum Kind { ASSIGN, UNSET, ECHO, GREP, STORE, EACH, NONE }
+    public enum Kind { ASSIGN, UNSET, ECHO, GREP, STORE, EACH, SURFACE, NONE }
 
-    /** For ASSIGN: name and raw value; UNSET: name; ECHO, GREP, STORE, EACH: the text after the word; NONE: the whole command. */
+    /** For ASSIGN: name and raw value; UNSET: name; ECHO, GREP, STORE, EACH, SURFACE: the text after the word; NONE: the whole command. */
     public record Call(Kind kind, String name, String argument) {}
 
     private static final Pattern ASSIGN = Pattern.compile("((?:my\\.|global\\.)?[A-Za-z_][A-Za-z0-9_]*)=(.*)", Pattern.DOTALL);
@@ -26,7 +26,7 @@ public final class Builtins {
         if (command.equals("echo") || command.startsWith("echo ")) {
             return new Call(Kind.ECHO, "", command.length() > 5 ? command.substring(5) : "");
         }
-        for (Kind kind : List.of(Kind.GREP, Kind.STORE, Kind.EACH)) {
+        for (Kind kind : List.of(Kind.GREP, Kind.STORE, Kind.EACH, Kind.SURFACE)) {
             String word = kind.name().toLowerCase(java.util.Locale.ROOT);
             if (command.equals(word) || command.startsWith(word + " ")) {
                 return new Call(kind, "", command.length() > word.length() + 1 ? command.substring(word.length() + 1) : "");

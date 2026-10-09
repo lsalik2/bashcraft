@@ -13,7 +13,8 @@
 			"net.slk.bashcraft.test.BashcraftClientCheck",
 			"net.slk.bashcraft.test.BashcraftChatCheck",
 			"net.slk.bashcraft.test.BashcraftVariableCheck",
-			"net.slk.bashcraft.test.BashcraftPlumbingCheck"
+			"net.slk.bashcraft.test.BashcraftPlumbingCheck",
+			"net.slk.bashcraft.test.BashcraftSurfaceCheck"
 		]
 	},
 	"depends": {

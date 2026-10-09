@@ -9,7 +9,10 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.execution.ExecutionContext;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.SignableCommand;
+import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.slk.bashcraft.exec.CommandRunner;
 import net.slk.bashcraft.exec.ExecResult;
 import net.slk.bashcraft.exec.RunOptions;
@@ -18,6 +21,7 @@ import net.slk.bashcraft.mixin.CommandsAccessor;
 import net.slk.bashcraft.pipe.Feedback;
 
 import java.util.List;
+import java.util.OptionalInt;
 
 /** Runs chain segments as the invoking source, to completion, capturing result and feedback. */
 public final class MinecraftCommandRunner implements CommandRunner {
@@ -63,6 +67,30 @@ public final class MinecraftCommandRunner implements CommandRunner {
         invoker.withSource(tee).sendSuccess(() -> Component.literal(text), false);
         List<Feedback> output = tee.captured().stream().map(ComponentFeedback::toFeedback).toList();
         return new ExecResult(true, 1, output);
+    }
+
+    /** World coordinates beyond this are outside the world border's maximum. */
+    private static final int WORLD_LIMIT = 29_999_984;
+
+    @Override
+    public OptionalInt surfaceY(int x, int z, RunOptions options) {
+        String prefix = prefix(options);
+        // Loading (possibly generating) a distant chunk is expensive: the same permission /locate needs.
+        if (!Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(invoker)) {
+            reportError(prefix + "surface needs operator permission");
+            return OptionalInt.empty();
+        }
+        ServerLevel level = invoker.getLevel();
+        if (level.dimensionType().hasCeiling()) {
+            reportError(prefix + "surface doesn't work in dimensions with a ceiling");
+            return OptionalInt.empty();
+        }
+        if (Math.abs(x) > WORLD_LIMIT || Math.abs(z) > WORLD_LIMIT) {
+            reportError(prefix + "surface: outside the world");
+            return OptionalInt.empty();
+        }
+        level.getChunk(SectionPos.blockToSectionCoord(x), SectionPos.blockToSectionCoord(z));
+        return OptionalInt.of(level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z));
     }
 
     @Override

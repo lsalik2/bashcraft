@@ -144,7 +144,8 @@ public final class ChainExecutor {
             String text = call.argument();
             if (call.kind() != Builtins.Kind.UNSET && call.kind() != Builtins.Kind.EACH) {
                 try {
-                    boolean takesPipe = call.kind() != Builtins.Kind.GREP && call.kind() != Builtins.Kind.STORE;
+                    boolean takesPipe = call.kind() != Builtins.Kind.GREP && call.kind() != Builtins.Kind.STORE
+                            && call.kind() != Builtins.Kind.SURFACE;
                     Expander.Expansion expansion = Expander.expandParts(text, variables, lastStatus, this::substitute,
                             input == null || !takesPipe ? null : new Expander.PipeInput(input.value(), input.result()));
                     text = finalText(call, command.text(), expansion);
@@ -154,7 +155,8 @@ public final class ChainExecutor {
                     return finish(ExecResult.failure(), command);
                 }
             }
-            if (call.kind() == Builtins.Kind.GREP || call.kind() == Builtins.Kind.STORE || call.kind() == Builtins.Kind.EACH) {
+            if (call.kind() == Builtins.Kind.GREP || call.kind() == Builtins.Kind.STORE || call.kind() == Builtins.Kind.EACH
+                    || call.kind() == Builtins.Kind.SURFACE) {
                 if (input == null) {
                     runner.reportError(label(command) + call.kind().name().toLowerCase(java.util.Locale.ROOT) + " needs piped input");
                     return finish(ExecResult.failure(), command);
@@ -177,6 +179,7 @@ public final class ChainExecutor {
                 case UNSET -> unset(command, call.name());
                 case GREP -> grep(command, text, input);
                 case STORE -> store(command, text, input, options);
+                case SURFACE -> surface(command, text, input, options);
                 case EACH -> throw new IllegalStateException("each is handled above");
             };
             return finish(result, command);
@@ -261,6 +264,35 @@ public final class ChainExecutor {
             }
             ExecResult result = runner.run(vanilla, options);
             return new ExecResult(result.success(), result.errored(), result.result(), List.of(), input.value());
+        }
+
+        /** surface: the piped coordinates with Y replaced by the standing height at that x and z. */
+        private ExecResult surface(Node.Command command, String arguments, Piped input, RunOptions options) {
+            if (!arguments.isBlank()) {
+                runner.reportError(label(command) + "surface takes no arguments");
+                return ExecResult.failure();
+            }
+            List<String> xyz = switch (input.value()) {
+                case PipeValue.Coordinates c -> List.of(c.x(), c.y(), c.z());
+                case PipeValue.Items items when items.items().size() == 3 -> items.items();
+                default -> null;
+            };
+            if (xyz == null) {
+                runner.reportError(label(command) + "surface needs coordinates");
+                return ExecResult.failure();
+            }
+            String number = "-?\\d+(\\.\\d+)?";
+            if (!xyz.get(0).matches(number) || !xyz.get(2).matches(number)) {
+                runner.reportError(label(command) + "surface needs absolute x and z");
+                return ExecResult.failure();
+            }
+            int x = (int) Math.floor(Double.parseDouble(xyz.get(0)));
+            int z = (int) Math.floor(Double.parseDouble(xyz.get(2)));
+            java.util.OptionalInt y = runner.surfaceY(x, z, options);
+            if (y.isEmpty()) {
+                return ExecResult.failure();
+            }
+            return new ExecResult(true, false, y.getAsInt(), List.of(), new PipeValue.Coordinates(xyz.get(0), Integer.toString(y.getAsInt()), xyz.get(2)));
         }
 
         /** A number for store score: a numeric value, or a one-item list whose item is a number; rounded down. */

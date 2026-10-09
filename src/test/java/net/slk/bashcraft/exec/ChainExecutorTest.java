@@ -2,6 +2,7 @@ package net.slk.bashcraft.exec;
 
 import net.slk.bashcraft.chain.NodeParser;
 import net.slk.bashcraft.pipe.Feedback;
+import net.slk.bashcraft.pipe.PipeValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -569,5 +570,39 @@ class ChainExecutorTest {
         run(r, elevated(Map.of(), Map.of()), "names | each say {value}");
         assertEquals(1, r.errors.size());
         assertEquals(List.of("names"), r.ran);
+    }
+
+    @Test
+    void surfaceReplacesY() throws Exception {
+        FakeRunner r = new FakeRunner().on("locate structure #minecraft:village", new ExecResult(true, 845, List.of(locateVillage())));
+        run(r, table(), "locate structure #minecraft:village | surface | tp @s");
+        assertEquals("tp @s 312 70 -1040", r.ran.getLast());
+        assertEquals(List.of("312,-1040"), r.surfaced);
+    }
+
+    @Test
+    void surfaceAcceptsThreeNumberLists() throws Exception {
+        FakeRunner r = new FakeRunner().on("pos", new ExecResult(true, false, 1, List.of(), new PipeValue.Items(List.of("10.5", "64.0", "-3.2"))));
+        run(r, table(), "pos | surface | tp @s");
+        assertEquals("tp @s 10.5 70 -3.2", r.ran.getLast());
+        assertEquals(List.of("10,-4"), r.surfaced);
+    }
+
+    @Test
+    void surfaceNeedsAbsoluteCoordinatesAndAPipe() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "echo ~ 64 ~ | surface ; echo hello | surface ; surface ; echo 1 2 3 | surface x");
+        assertEquals(List.of("[2] surface needs absolute x and z", "[4] surface needs coordinates", "[5] surface needs piped input",
+                "[7] surface takes no arguments"), r.errors);
+        assertTrue(r.surfaced.isEmpty());
+    }
+
+    @Test
+    void surfaceRefusedByTheRunnerFails() throws Exception {
+        FakeRunner r = new FakeRunner();
+        r.refuseSurface = true;
+        run(r, table(), "echo 1 2 3 | surface || say refused");
+        assertEquals(List.of("[2] surface needs operator permission"), r.errors);
+        assertEquals(List.of("say refused"), r.ran);
     }
 }

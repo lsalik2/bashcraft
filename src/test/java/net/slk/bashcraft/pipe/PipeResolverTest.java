@@ -101,4 +101,11 @@ class PipeResolverTest {
         assertThrows(PipeException.class, () -> PipeResolver.resolve(List.of()));
         assertThrows(PipeException.class, () -> resolve(Feedback.plain("   ")));
     }
+
+    @Test
+    void fallbackReadsSpaceSeparatedCoordinates() throws Exception {
+        assertEquals(new PipeValue.Coordinates("100", "~", "-20"), resolve(Feedback.plain("100 ~ -20")));
+        assertEquals(new PipeValue.Coordinates("^", "^1.5", "^"), resolve(Feedback.plain(" ^ ^1.5 ^ ")));
+        assertEquals(new PipeValue.Numeric("4"), resolve(Feedback.plain("1 2 3 4")), "four numbers are not coordinates");
+    }
 }

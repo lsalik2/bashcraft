@@ -100,6 +100,11 @@ TEXT (any case; `-x` whole item, `-v` the others) and fails if none are left. `e
 (`{value}` is the item) and passes on the values they produce. `store score HOLDER OBJECTIVE` (numbers, rounded down)
 and `store storage ID PATH` run the matching vanilla command as you, so they need its permissions.
 
+`surface` replaces the Y of piped coordinates with the ground height there (ignoring leaves), so
+`/sh locate structure #minecraft:village | surface | tp @s` lands you on the ground instead of keeping your height.
+It loads that chunk (generating it if needed), so it needs operator permission, like `/locate`, and it isn't available
+in dimensions with a ceiling such as the Nether. `echo 100 ~ -20 | surface` works too.
+
 ### Without `/sh`
 
 Chains also work typed directly, as long as every command after an operator starts with `/`:

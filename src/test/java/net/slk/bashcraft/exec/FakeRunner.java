@@ -37,4 +37,18 @@ final class FakeRunner implements CommandRunner {
         this.options.add(options);
         return new ExecResult(true, 1, List.of(net.slk.bashcraft.pipe.Feedback.plain(text)));
     }
+
+    final List<String> surfaced = new ArrayList<>();
+    int surfaceHeight = 70;
+    boolean refuseSurface;
+
+    @Override
+    public java.util.OptionalInt surfaceY(int x, int z, RunOptions options) {
+        surfaced.add(x + "," + z);
+        if (refuseSurface) {
+            errors.add((options.failurePrefix() == null ? "" : options.failurePrefix()) + "surface needs operator permission");
+            return java.util.OptionalInt.empty();
+        }
+        return java.util.OptionalInt.of(surfaceHeight);
+    }
 }
