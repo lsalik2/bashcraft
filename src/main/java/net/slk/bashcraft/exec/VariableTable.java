@@ -45,6 +45,23 @@ public final class VariableTable implements Variables {
         };
     }
 
+    /** A chain whose unscoped names don't prefer the player's set wasn't typed by that player. */
+    @Override
+    public boolean elevated() {
+        return !preferMine;
+    }
+
+    /** Values from the global set are trusted (only operators write it); a player's set only in their own chain. */
+    @Override
+    public boolean trusted(Scope scope, String name) {
+        Map<String, String> source = switch (scope) {
+            case OWN -> mine;
+            case GLOBAL -> global;
+            case ANY -> preferMine && mine.containsKey(name) ? mine : global;
+        };
+        return source == global || preferMine;
+    }
+
     @Override
     public void set(Scope scope, String name, String value) throws ExpansionException {
         Map<String, String> target = writable(scope);

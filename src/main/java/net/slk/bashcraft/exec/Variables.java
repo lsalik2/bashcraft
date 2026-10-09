@@ -14,6 +14,20 @@ public interface Variables {
 
     void unset(Scope scope, String name) throws ExpansionException;
 
+    /**
+     * Whether the chain runs with more trust than the player it may read from: a function, command block, the
+     * console or {@code execute as … run sh} rather than a chain the player typed. In such chains player-controlled
+     * text (their own set, pipe and $( … ) output) may only be plain (spec C1 §9).
+     */
+    default boolean elevated() {
+        return false;
+    }
+
+    /** Whether the value {@link #get} would return for this name may be inserted as-is (it isn't player-controlled). */
+    default boolean trusted(Scope scope, String name) {
+        return true;
+    }
+
     /** Splits {@code my.x} / {@code global.x} / {@code x}; an unscoped name gets {@code unscoped}. */
     static Ref ref(String qualified, Scope unscoped) {
         if (qualified.startsWith("my.")) {

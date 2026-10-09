@@ -397,4 +397,54 @@ class ChainExecutorTest {
         run(r, table(), "x='say \"hi\" && b' ; tellraw @a $x");
         assertEquals(List.of("tellraw @a say \"hi\" && b"), r.ran);
     }
+
+    /** A chain run by a function as a player: unscoped names use the global set; the player's set is untrusted. */
+    private static VariableTable elevated(Map<String, String> mine, Map<String, String> global) {
+        return new VariableTable(new HashMap<>(mine), new HashMap<>(global), false, true);
+    }
+
+    private static final String JSON_ATTACK = "\",\"clickEvent\":{\"action\":\"run_command\",\"value\":\"/op Steve\"},\"text\":\"";
+
+    @Test
+    void elevatedChainsRefuseStructuredPlayerText() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, elevated(Map.of("nick", JSON_ATTACK), Map.of()), "tellraw @a {\"text\":\"$my.nick\"}");
+        assertEquals(List.of("a value from a player can only be plain text here (letters, digits, spaces and _ . : ~ ^ + -)"), r.errors);
+        assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void elevatedChainsAcceptPlainPlayerValues() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, elevated(Map.of("home", "0 80.5 -3", "block", "minecraft:stone"), Map.of()), "setblock $my.home $my.block");
+        assertEquals(List.of("setblock 0 80.5 -3 minecraft:stone"), r.ran);
+    }
+
+    @Test
+    void elevatedPipeAndSubstitutionTextMustBePlain() throws Exception {
+        FakeRunner r = new FakeRunner().on("get", new ExecResult(true, 1, List.of(Feedback.plain("a\"b"))));
+        run(r, elevated(Map.of(), Map.of()), "get | say {value} ; say $(echo x{y) ; echo 7 | say {value}");
+        assertEquals(2, r.errors.size());
+        assertTrue(r.errors.stream().allMatch(e -> e.contains("a value from a player can only be plain text here")));
+        assertEquals(List.of("get", "say 7"), r.ran);
+    }
+
+    @Test
+    void elevatedChainsCantLaunderPlayerTextIntoTheGlobalSet() throws Exception {
+        FakeRunner r = new FakeRunner();
+        VariableTable v = elevated(Map.of("nick", JSON_ATTACK), Map.of());
+        run(r, v, "x=$my.nick");
+        assertEquals(Optional.empty(), v.get(Variables.Scope.GLOBAL, "x"));
+        assertEquals(1, r.errors.size());
+    }
+
+    @Test
+    void globalValuesAndPlayersOwnChainsAreUnrestricted() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, elevated(Map.of(), Map.of("j", "{\"text\":\"hi\"}")), "tellraw @a $j");
+        assertEquals(List.of("tellraw @a {\"text\":\"hi\"}"), r.ran);
+        FakeRunner own = new FakeRunner();
+        run(own, table(), "x='a\"b' ; say $x");
+        assertEquals(List.of("say a\"b"), own.ran);
+    }
 }

@@ -37,6 +37,12 @@ public class BashcraftVariableCheck implements FabricClientGameTest {
             context.runOnClient(client -> client.getConnection().sendCommand("sh x=9"));
             context.waitTicks(5);
             server.runCommand("execute unless data storage bashcraft:vars global.g run setblock 10 120 13 minecraft:stone");
+            // SNBT injection: a player's nickname that breaks out of the CustomName string and re-tags the entity.
+            context.runOnClient(client -> client.getConnection().sendCommand("sh nick='x\",Tags:[\"bc_pwned\"],CustomName:\"y'"));
+            context.waitTicks(5);
+            server.runCommand("execute as @p run sh summon minecraft:armor_stand 0 120 14 {Tags:[\"bc_safe\"],CustomName:\"$my.nick\"}");
+            server.runCommand("execute if entity @e[tag=bc_pwned] run setblock 12 120 14 minecraft:stone");
+            check(!stone(server, 12, 14), "a player's text can't inject SNBT into a command an elevated chain runs");
             check(stone(server, 10, 13), "a non-op player can't write the global set");
             server.runCommand("execute as @p run sh setblock $x 120 13 minecraft:stone");
             check(stone(server, 1, 13) && !stone(server, 9, 13), "a player's own x doesn't shadow the global x in an elevated chain");

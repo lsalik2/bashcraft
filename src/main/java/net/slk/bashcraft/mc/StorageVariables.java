@@ -60,6 +60,16 @@ public final class StorageVariables implements Variables {
     }
 
     @Override
+    public boolean elevated() {
+        return !preferMine;
+    }
+
+    @Override
+    public boolean trusted(Scope scope, String name) {
+        return table(storage.get(ID), false).trusted(scope, name);
+    }
+
+    @Override
     public void set(Scope scope, String name, String value) throws ExpansionException {
         CompoundTag root = storage.get(ID);
         table(root, true).set(scope, name, value);

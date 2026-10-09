@@ -72,8 +72,10 @@ and 32767 characters per expanded command. `$` reads only string values; other d
 
 **Security notes:**
 - Anyone can read the global set with `echo $global.x`; don't keep secrets there.
-- A player controls their own set: in functions, command blocks and `execute as … run sh`, treat `$my.x` as untrusted
-  text — it can still change a single command's arguments (`give @s $my.item`).
+- In functions, command blocks, the console and `execute as … run sh`, player-controlled values — `$my.x`, pipe
+  values, placeholders and `$( … )` output — must be plain text (letters, digits, spaces and `_ . : ~ ^ + -`), or the
+  command is refused. That stops a player's text from breaking out of JSON (`{"text":"…"}`), NBT or selectors. A plain
+  value can still change a command's arguments (`give @s $my.item` with `diamond 64`), so check values you rely on.
 - Values inserted into a command that can run other commands — `sh …`, anything with `run` (`execute … run …`,
   `return run …`), `function …` (macro arguments), or a command whose name is itself a `$` reference — are escaped, so
   an inner chain or macro sees them as plain text, never as `&&`, `;`, `$( … )`; a value containing a quote is refused

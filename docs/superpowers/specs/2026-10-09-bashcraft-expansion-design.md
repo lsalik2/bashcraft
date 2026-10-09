@@ -129,3 +129,12 @@ name is itself a `$` reference. If one of those words comes from an inserted val
 `r=run`, or `$c …` with `c=sh`), the command is refused: `a value can't decide which commands run`. Outside double quotes, the expander treats `\'` and `\"` like the tokenizer does (the
 quote opens).
 
+**Plain-value rule (2026-10-09, after the injection review).** Escaping can't protect every parser a value later
+reaches (JSON text components, SNBT, selectors, macros, other mods' commands). So in an *elevated* chain — one not
+typed by the player it reads from: functions, command blocks, the console, `execute as … run sh` — every
+player-controlled value must be plain text matching `[A-Za-z0-9 _.:~^+-]*`, or the command fails with `a value from a
+player can only be plain text here (letters, digits, spaces and _ . : ~ ^ + -)`. Player-controlled means: a variable
+read from a player's own set, and any pipe value, placeholder or `$( … )` output. Global-set values (written only by
+operators) and everything in a chain the player typed themselves are not restricted. The check applies to builtins
+too, so player text can't be copied into the global set. The escaping above remains as a second layer.
+

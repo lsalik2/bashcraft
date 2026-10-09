@@ -32,6 +32,10 @@ public final class Expander {
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{(x|y|z|value|result)}");
     private static final String ESCAPED_IN_NESTED = "\\&|;()$";
+    /** What player-controlled text may look like in an elevated chain: no quotes, brackets, braces, operators, @ or \\. */
+    private static final Pattern PLAIN = Pattern.compile("[A-Za-z0-9 _.:~^+\\-]*");
+    static final String NOT_PLAIN = "a value from a player can only be plain text here (letters, digits, spaces and _ . : ~ ^ + -)";
+
     private static final Pattern NAME = Pattern.compile("(?:(?:my|global)\\.)?[A-Za-z_][A-Za-z0-9_]*");
 
     private Expander() {}
@@ -195,13 +199,14 @@ public final class Expander {
                 case STATUS -> new Part(Integer.toString(lastStatus), true);
                 case VARIABLE -> {
                     Variables.Ref ref = Variables.ref(reference.body(), Variables.Scope.ANY);
-                    yield new Part(variables.get(ref.scope(), ref.name())
-                            .orElseThrow(() -> new ExpansionException("$" + reference.body() + " is not set")), true);
+                    String value = variables.get(ref.scope(), ref.name())
+                            .orElseThrow(() -> new ExpansionException("$" + reference.body() + " is not set"));
+                    yield new Part(checked(value, !variables.trusted(ref.scope(), ref.name())), true);
                 }
-                case SUBSTITUTION -> new Part(substituter.run(reference.body()), true);
+                case SUBSTITUTION -> new Part(checked(substituter.run(reference.body()), variables.elevated()), true);
                 case PLACEHOLDER -> {
                     placed = true;
-                    yield new Part(placeholder(reference.body(), input), true);
+                    yield new Part(checked(placeholder(reference.body(), input), variables.elevated()), true);
                 }
                 default -> throw new ExpansionException(reference.body());
             };
@@ -216,7 +221,7 @@ public final class Expander {
         if (input != null && !placed) {
             stripTrailing(parts);
             parts.add(new Part(" ", false));
-            parts.add(new Part(input.value().asArgument(), true));
+            parts.add(new Part(checked(input.value().asArgument(), variables.elevated()), true));
         }
         Expansion expansion = new Expansion(parts);
         expansion.join(false);
@@ -233,6 +238,14 @@ public final class Expander {
                 return;
             }
         }
+    }
+
+    /** Player-controlled text in an elevated chain must be plain, so no parser after us can read it as syntax. */
+    private static String checked(String value, boolean untrusted) throws ExpansionException {
+        if (untrusted && !PLAIN.matcher(value).matches()) {
+            throw new ExpansionException(NOT_PLAIN);
+        }
+        return value;
     }
 
     private static String placeholder(String name, PipeInput input) throws ExpansionException {
