@@ -82,4 +82,13 @@ class ChainLayoutTest {
         assertEquals(new Window(14, 14), layout.window(14));
         assertEquals(new Window(16, 16), layout.window(16));
     }
+
+    @Test
+    void noCommandStartsRightAfterAGroupOrInsideAnOperator() {
+        ChainLayout layout = input("/(/say a) && /say b");
+        assertFalse(layout.commandCanStartAt(9), "after ')' only an operator can follow");
+        assertFalse(layout.commandCanStartAt(11), "inside '&&'");
+        assertTrue(layout.commandCanStartAt(13), "after '&& '");
+        assertTrue(layout.commandCanStartAt(16), "inside a command");
+    }
 }

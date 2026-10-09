@@ -12,6 +12,9 @@ public class BashcraftClient implements ClientModInitializer {
     public void onInitializeClient() {
         ClientPlayNetworking.registerGlobalReceiver(HelloPayload.TYPE,
                 (payload, context) -> ClientChains.accept(payload.protocol(), payload.transparentMode()));
+        // A new play connection (including a proxy's switch to another backend, which never fires DISCONNECT) starts
+        // without BashCraft until that server says hello.
+        ClientPlayConnectionEvents.INIT.register((handler, client) -> ClientChains.clear());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientChains.clear());
     }
 }

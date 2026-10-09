@@ -37,6 +37,20 @@ public class BashcraftChatCheck implements FabricClientGameTest {
             check(context.computeOnClient(client -> ChatProbe.usage(client).getFirst().startsWith("BashCraft: unclosed '('")),
                     "an unclosed group shows the BashCraft hint");
 
+            context.runOnClient(client -> ChatProbe.open(client, "/(/tp @s ~ ~ ~ && /summon "));
+            context.waitFor(client -> ChatProbe.usage(client).stream().anyMatch(line -> line.contains("<entity>")), 100);
+
+            context.runOnClient(client -> {
+                ChatProbe.open(client, "/(/say a) && /say b");
+                ChatProbe.moveCursor(client, 9);
+            });
+            context.waitTicks(2);
+            check(context.computeOnClient(client -> ChatProbe.completions(client).isEmpty()), "nothing is suggested right after ')'");
+
+            context.runOnClient(client -> ChatProbe.open(client, "/sh say hi && /tp @s ~ ~ ~"));
+            context.waitTicks(2);
+            check(context.computeOnClient(ChatProbe::isMessage), "a chat command anywhere in the chain marks the line as a message");
+
             context.runOnClient(client -> ChatProbe.open(client, "/tp @s ~ ~ ~"));
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "a vanilla line is unchanged");

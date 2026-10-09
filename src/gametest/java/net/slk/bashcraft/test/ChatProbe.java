@@ -80,6 +80,16 @@ final class ChatProbe {
         }).toList();
     }
 
+    /** Whether the helper treats the line as containing a chat message (vanilla blocks those for chat-restricted accounts). */
+    static boolean isMessage(Minecraft client) {
+        return (Boolean) read(CommandSuggestions.class, suggestions(client), "currentParseIsMessage");
+    }
+
+    static void moveCursor(Minecraft client, int position) {
+        ((EditBox) read(ChatScreen.class, client.gui.screen(), "input")).setCursorPosition(position);
+        suggestions(client).updateCommandInfo();
+    }
+
     private static Object read(Class<?> owner, Object target, String field) {
         try {
             Field f = owner.getDeclaredField(field);

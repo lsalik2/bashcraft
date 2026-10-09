@@ -13,6 +13,7 @@ import net.slk.bashcraft.pipe.Placeholders;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -31,13 +32,18 @@ public final class ChainStyles {
 
     private final String value;
     private final Style[] styles;
+    private final boolean hasMessages;
 
-    private ChainStyles(String value, Style[] styles) {
+    private ChainStyles(String value, Style[] styles, boolean hasMessages) {
         this.value = value;
         this.styles = styles;
+        this.hasMessages = hasMessages;
     }
 
-    public static <S> ChainStyles compute(String value, ChainLayout layout, CommandDispatcher<S> dispatcher, S source) {
+    /** @param isMessage vanilla's test for chat-message arguments, applied to every command in the chain */
+    public static <S> ChainStyles compute(String value, ChainLayout layout, CommandDispatcher<S> dispatcher, S source,
+                                          Predicate<ParseResults<S>> isMessage) {
+        boolean hasMessages = false;
         Style[] styles = new Style[value.length()];
         Arrays.fill(styles, LITERAL);
         String masked = Placeholders.mask(value);
@@ -49,6 +55,7 @@ public final class ChainStyles {
             StringReader reader = new StringReader(masked.substring(0, span.end()));
             reader.setCursor(span.start());
             ParseResults<S> parse = dispatcher.parse(reader, source);
+            hasMessages |= isMessage.test(parse);
             int color = -1;
             for (ParsedArgument<S, ?> argument : parse.getContext().getLastChild().getArguments().values()) {
                 if (++color >= ARGUMENTS.size()) {
@@ -63,7 +70,12 @@ public final class ChainStyles {
         for (int[] range : Placeholders.ranges(value)) {
             fill(styles, range[0], range[1], PLACEHOLDER);
         }
-        return new ChainStyles(value, styles);
+        return new ChainStyles(value, styles, hasMessages);
+    }
+
+    /** Whether any command in the chain takes a chat message (vanilla blocks those for chat-restricted accounts). */
+    public boolean hasMessages() {
+        return hasMessages;
     }
 
     public boolean matches(String text) {

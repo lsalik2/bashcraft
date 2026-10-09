@@ -28,6 +28,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /** Chains in chat and the command-block screen: highlight, complete and report errors per command (spec B §5). */
 @Mixin(CommandSuggestions.class)
@@ -35,8 +36,13 @@ public abstract class CommandSuggestionsMixin {
     @Shadow @Final private EditBox input;
     @Shadow @Final private boolean commandsOnly;
     @Shadow @Final private List<FormattedCharSequence> commandUsage;
-    @Shadow private int commandUsagePosition;
     @Shadow private ParseResults<ClientSuggestionProvider> currentParse;
+    @Shadow private boolean currentParseIsMessage;
+
+    @Shadow
+    private static boolean hasMessageArguments(ParseResults<ClientSuggestionProvider> parseResults) {
+        throw new AssertionError();
+    }
 
     @Shadow
     private void recomputeUsageBoxWidth() {}
@@ -57,7 +63,7 @@ public abstract class CommandSuggestionsMixin {
             Minecraft minecraft = Minecraft.getInstance();
             if (layout != null && minecraft.player != null) {
                 bashcraft$styles = ChainStyles.compute(value, layout, minecraft.player.connection.getCommands(),
-                        minecraft.player.connection.getSuggestionsProvider());
+                        minecraft.player.connection.getSuggestionsProvider(), CommandSuggestionsMixin::hasMessageArguments);
                 bashcraft$layout = layout;
                 // The parse depends on where the cursor is, not just on the text.
                 currentParse = null;
@@ -100,16 +106,43 @@ public abstract class CommandSuggestionsMixin {
         }
     }
 
-    @Inject(method = "updateUsageInfo", at = @At("HEAD"), cancellable = true)
+    /** The chain's message flag covers every command, not just the one under the cursor. */
+    @Inject(method = "updateCommandInfo", at = @At("TAIL"))
+    private void bashcraft$messageFlag(CallbackInfo ci) {
+        ChainStyles styles = bashcraft$styles;
+        if (styles != null && styles.hasMessages()) {
+            currentParseIsMessage = true;
+        }
+    }
+
+    /** Right after ')' or inside an operator no command can start, so suggest nothing there. */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @WrapOperation(method = "updateCommandInfo", at = @At(value = "INVOKE",
+            target = "Lcom/mojang/brigadier/CommandDispatcher;getCompletionSuggestions(Lcom/mojang/brigadier/ParseResults;I)Ljava/util/concurrent/CompletableFuture;"))
+    private CompletableFuture bashcraft$noSuggestionsAfterGroup(CommandDispatcher dispatcher, ParseResults parse, int cursor, Operation<CompletableFuture> original) {
+        ChainLayout layout = bashcraft$layout;
+        try {
+            if (layout != null && !layout.commandCanStartAt(cursor)) {
+                return Suggestions.empty();
+            }
+        } catch (RuntimeException e) {
+            ClientHooks.failed(e);
+        }
+        return original.call(dispatcher, parse, cursor);
+    }
+
+    /** A BashCraft syntax error goes on top of vanilla's usage lines; vanilla still shows suggestions and hints. */
+    @Inject(method = "updateUsageInfo", at = @At("TAIL"))
     private void bashcraft$chainError(ParseResults<ClientSuggestionProvider> parse, Suggestions suggestions, CallbackInfo ci) {
         ChainLayout layout = bashcraft$layout;
         if (layout == null || layout.error().isEmpty()) {
             return;
         }
-        commandUsage.clear();
-        commandUsage.add(Component.literal("BashCraft: " + layout.error().get().getMessage()).withStyle(ChatFormatting.RED).getVisualOrderText());
-        commandUsagePosition = 0;
-        recomputeUsageBoxWidth();
-        ci.cancel();
+        try {
+            commandUsage.addFirst(Component.literal("BashCraft: " + layout.error().get().getMessage()).withStyle(ChatFormatting.RED).getVisualOrderText());
+            recomputeUsageBoxWidth();
+        } catch (RuntimeException e) {
+            ClientHooks.failed(e);
+        }
     }
 }

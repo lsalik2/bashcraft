@@ -99,4 +99,29 @@ public record ChainLayout(List<Span> spans, Optional<ChainSyntaxException> error
         }
         return new Window(cursor, cursor);
     }
+
+    /**
+     * Whether a command may start at {@code cursor} (so suggesting command names makes sense): not right after a
+     * {@code )}, where only an operator can follow, and not inside an operator.
+     */
+    public boolean commandCanStartAt(int cursor) {
+        Window window = window(cursor);
+        if (window.start() != window.end()) {
+            return true;
+        }
+        Span before = null;
+        for (Span span : spans) {
+            if (span.start() < cursor) {
+                before = span;
+            }
+        }
+        if (before == null) {
+            return true;
+        }
+        return switch (before.kind()) {
+            case GROUP_CLOSE -> false;
+            case OPERATOR -> cursor >= before.end();
+            default -> true;
+        };
+    }
 }
