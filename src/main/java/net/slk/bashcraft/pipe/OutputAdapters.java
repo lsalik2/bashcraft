@@ -29,7 +29,12 @@ final class OutputAdapters {
             Map.entry("commands.tag.list.multiple.success", f -> list(f, 2)),
             Map.entry("commands.team.list.members.success", f -> list(f, 2)),
             Map.entry("commands.team.list.teams.success", f -> list(f, 1)),
-            Map.entry("commands.scoreboard.players.list.success", f -> list(f, 1)));
+            Map.entry("commands.scoreboard.players.list.success", f -> list(f, 1)),
+            Map.entry("commands.tag.list.single.empty", f -> Optional.of(new PipeValue.Items(List.of()))),
+            Map.entry("commands.tag.list.multiple.empty", f -> Optional.of(new PipeValue.Items(List.of()))),
+            Map.entry("commands.team.list.members.empty", f -> Optional.of(new PipeValue.Items(List.of()))),
+            Map.entry("commands.team.list.teams.empty", f -> Optional.of(new PipeValue.Items(List.of()))),
+            Map.entry("commands.scoreboard.players.list.empty", f -> Optional.of(new PipeValue.Items(List.of()))));
 
     private OutputAdapters() {}
 

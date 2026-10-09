@@ -84,6 +84,7 @@ public final class ChainExecutor {
         private final boolean numbered;
         private int lastStatus;
         private boolean budgetExceeded;
+        private boolean expansionFailed;
 
         Run(Map<Node.Command, Integer> numbers, boolean numbered) {
             this.numbers = numbers;
@@ -138,6 +139,7 @@ public final class ChainExecutor {
 
         private Outcome command(Node.Command command, Piped input, boolean feedsPipe) {
             budgetExceeded = false;
+            expansionFailed = false;
             Builtins.Call call = Builtins.classify(command.text());
             String text = call.argument();
             if (call.kind() != Builtins.Kind.UNSET && call.kind() != Builtins.Kind.EACH) {
@@ -147,6 +149,7 @@ public final class ChainExecutor {
                             input == null || !takesPipe ? null : new Expander.PipeInput(input.value(), input.result()));
                     text = finalText(call, command.text(), expansion);
                 } catch (ExpansionException e) {
+                    expansionFailed = true;
                     runner.reportError(label(command) + e.getMessage());
                     return finish(ExecResult.failure(), command);
                 }
@@ -279,8 +282,8 @@ public final class ChainExecutor {
                 return ExecResult.failure();
             }
             if (input.items().isEmpty()) {
-                runner.reportError(label(command) + "each had no items");
-                return ExecResult.failure();
+                // Nothing to do (e.g. a grep that matched nothing): a quiet failure, like bash's exit status.
+                return new ExecResult(false, false, 0, List.of(), new PipeValue.Items(List.of()));
             }
             Node.Command run = new Node.Command(body.strip());
             numbers.put(run, numbers.get(command));
@@ -301,8 +304,8 @@ public final class ChainExecutor {
                         // A run without a value adds nothing.
                     }
                 }
-                if (budgetExceeded) {
-                    // Every further run would be refused the same way.
+                if (budgetExceeded || expansionFailed) {
+                    // Stop rather than report the same refusal once per item.
                     break;
                 }
             }

@@ -542,7 +542,7 @@ class ChainExecutorTest {
                 .on("say Alex", FAIL);
         run(r, table(), "list | each say || say partial ; empty | each say || say none ; list | each");
         assertEquals(List.of("list", "say Alex", "say Steve", "say partial", "empty", "say none", "list"), r.ran);
-        assertEquals(List.of("[5] each had no items", "[8] each needs a command"), r.errors);
+        assertEquals(List.of("[8] each needs a command"), r.errors);
     }
 
     @Test
@@ -561,5 +561,13 @@ class ChainExecutorTest {
         run(r, elevated(Map.of(), Map.of()), "names | each say {value}");
         assertEquals(List.of("names", "say Alex"), r.ran);
         assertEquals(List.of("[2] a value from a player can only be one plain word or a list of numbers here"), r.errors);
+    }
+
+    @Test
+    void eachStopsAtTheFirstRefusedItem() throws Exception {
+        FakeRunner r = new FakeRunner().on("names", new ExecResult(true, 3, List.of(players("a\"b", "Alex", "c\"d"))));
+        run(r, elevated(Map.of(), Map.of()), "names | each say {value}");
+        assertEquals(1, r.errors.size());
+        assertEquals(List.of("names"), r.ran);
     }
 }

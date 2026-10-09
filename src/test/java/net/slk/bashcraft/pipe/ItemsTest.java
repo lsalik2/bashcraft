@@ -66,4 +66,13 @@ class ItemsTest {
         assertEquals(new PipeValue.Numeric("-1.5"), PipeValue.of("-1.5"));
         assertEquals(new PipeValue.Text("Steve"), PipeValue.of("Steve"));
     }
+
+    @Test
+    void emptyListMessagesAreEmptyLists() throws Exception {
+        assertEquals(List.of(), resolve(Feedback.translatable("commands.tag.list.single.empty", "Steve has no tags", "Steve")).items());
+        assertEquals(List.of(), resolve(Feedback.translatable("commands.tag.list.multiple.empty", "x", 3)).items());
+        assertEquals(List.of(), resolve(Feedback.translatable("commands.team.list.members.empty", "x", "red")).items());
+        assertEquals(List.of(), resolve(Feedback.translatable("commands.team.list.teams.empty", "There are no teams")).items());
+        assertEquals(List.of(), resolve(Feedback.translatable("commands.scoreboard.players.list.empty", "There are no tracked entities")).items());
+    }
 }

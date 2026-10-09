@@ -38,6 +38,18 @@ public class BashcraftPlumbingCheck implements FabricClientGameTest {
             server.runCommand("execute if score Player0 bc matches 9 run setblock 4 120 15 minecraft:stone");
             check(stone(server, 4), "each runs a command per online player");
 
+            // /list and /team list show display names ([Admin] Steve, [red]); items must be the real names.
+            server.runCommand("team add red");
+            server.runCommand("team modify red prefix \"[Admin] \"");
+            server.runCommand("team join red @p");
+            server.runCommand("sh list | each scoreboard players set {value} bc 3");
+            server.runCommand("execute if score Player0 bc matches 3 run setblock 6 120 15 minecraft:stone");
+            check(stone(server, 6), "list items are player names, not team-decorated display names");
+            server.runCommand("sh team list | grep -x red && setblock 7 120 15 minecraft:stone");
+            check(stone(server, 7), "team list items are team names");
+            server.runCommand("team leave @p");
+            server.runCommand("scoreboard players set Player0 bc 9");
+
             server.runCommand("sh list | each scoreboard players get {value} bc | store storage bashcraft:test scores");
             server.runCommand("execute if data storage bashcraft:test {scores:[9]} run setblock 5 120 15 minecraft:stone");
             check(stone(server, 5), "each collects values into a list that store writes");

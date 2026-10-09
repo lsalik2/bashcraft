@@ -7,7 +7,8 @@ import java.util.List;
 /** Writes a pipe value as SNBT for {@code store storage}; text is always quoted by us, so it can't break out. */
 public final class Snbt {
     private static final String INTEGER = "-?\\d+";
-    private static final String NUMBER = "-?\\d+(\\.\\d+)?";
+    /** A number SNBT accepts: no leading zeros (an item like "01" stays a string). */
+    private static final String NUMBER = "-?(?:0|[1-9]\\d*)(\\.\\d+)?";
 
     private Snbt() {}
 
@@ -34,7 +35,7 @@ public final class Snbt {
 
     private static String number(String text, boolean forceDouble) {
         if (!forceDouble && fitsInt(text)) {
-            return text;
+            return Integer.toString(Integer.parseInt(text));
         }
         return Double.toString(Double.parseDouble(text)) + "d";
     }

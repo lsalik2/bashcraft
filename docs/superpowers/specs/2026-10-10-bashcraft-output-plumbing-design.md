@@ -12,7 +12,7 @@ Three builtin pipe stages that work on the values commands produce:
 /sh locate structure #minecraft:village | store storage bashcraft:places village
 /sh scoreboard players get @s kills | store score @s best
 /sh list | grep Steve && say Steve is online
-/sh list | each msg {value} hi
+/sh list | each give {value} minecraft:bread
 /sh list | each data get entity {value} XpLevel | store storage bashcraft:stats levels
 ```
 

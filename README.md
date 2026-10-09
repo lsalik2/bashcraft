@@ -63,7 +63,7 @@ succeeded, else `1`. `$( … )` runs a chain and inserts its value like a pipe w
 `echo text` prints it (and can be piped). Variables persist in command storage `bashcraft:vars`
 (`global` and `players.<uuid>`), so datapacks can use them with `/data`. Expansion works in `"…"` but not in `'…'`;
 `\$` is a literal `$`. An unset variable makes that command fail instead of running with a blank. Inside chains,
-`echo` and `unset` are BashCraft's even if a mod has commands with those names.
+`echo`, `unset`, `grep`, `store` and `each` are BashCraft's even if a mod has commands with those names.
 
 Limits: 256 variables per set, names up to 64 characters, values up to 1024 characters, at most 256 `$` references
 and 32767 characters per expanded command. `$` reads only string values; other data a datapack keeps in
@@ -90,7 +90,7 @@ and 32767 characters per expanded command. `$` reads only string values; other d
 /sh scoreboard players get @s kills | store score @s best
 /sh locate structure #minecraft:village | store storage bashcraft:places village
 /sh list | grep Steve && say Steve is online
-/sh list | each msg {value} hi
+/sh list | each give {value} minecraft:bread
 /sh list | each data get entity {value} XpLevel | store storage bashcraft:stats levels
 ```
 

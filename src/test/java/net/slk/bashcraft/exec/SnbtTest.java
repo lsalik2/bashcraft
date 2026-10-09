@@ -33,4 +33,11 @@ class SnbtTest {
     void snbtMixedNumbersBecomeDoubles() {
         assertEquals("[1.0d,2.5d]", Snbt.of(new PipeValue.Items(List.of("1", "2.5"))));
     }
+
+    @Test
+    void leadingZeros() {
+        assertEquals("7", Snbt.of(new PipeValue.Numeric("007")));
+        assertEquals("[\"01\",\"02\"]", Snbt.of(new PipeValue.Items(List.of("01", "02"))));
+        assertEquals("[0,10]", Snbt.of(new PipeValue.Items(List.of("0", "10"))));
+    }
 }
