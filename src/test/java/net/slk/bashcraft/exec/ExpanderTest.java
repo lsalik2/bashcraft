@@ -3,6 +3,7 @@ package net.slk.bashcraft.exec;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -92,5 +93,24 @@ class ExpanderTest {
     @Test
     void backslashBeforeAQuoteOpensTheQuoteLikeTheTokenizer() throws Exception {
         assertEquals("say \\'$x'", expand("say \\'$x'", vars("x", "1")));
+    }
+
+    private static String positional(String text, List<String> words) throws ExpansionException {
+        return Expander.expandParts(text, vars(), 0, chain -> "", null, words).join(false);
+    }
+
+    @Test
+    void positionalReferences() throws Exception {
+        assertEquals("a b c a b c 2 d a", positional("$1 $2 $@ $# ${3:-d} ${1:-x}", List.of("a", "b c")));
+        assertEquals("0", positional("$#", List.of()));
+        assertEquals("$3 is not set", assertThrows(ExpansionException.class, () -> positional("say $3", List.of("a"))).getMessage());
+    }
+
+    @Test
+    void positionalsAreLiteralOutsideAliases() throws Exception {
+        assertEquals("say costs $1, $@ and $#", expand("say costs $1, $@ and $#", vars()));
+        assertTrue(Expander.hasPositionals("say $1"));
+        assertTrue(Expander.hasPositionals("say ${2:-x} && b"));
+        assertFalse(Expander.hasPositionals("say $x '$1'"));
     }
 }

@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * {@code $?}, {@code $(…)} and {@code \$}. Double-quoted text expands; single-quoted text doesn't.
  */
 public final class Expander {
-    public enum Kind { VARIABLE, STATUS, SUBSTITUTION, ESCAPED_DOLLAR, PLACEHOLDER, ESCAPED_PLACEHOLDER, BAD }
+    public enum Kind { VARIABLE, STATUS, SUBSTITUTION, ESCAPED_DOLLAR, PLACEHOLDER, ESCAPED_PLACEHOLDER, POSITIONAL, BAD }
 
     /** {@code [start, end)} of one reference; body is the qualified name, the inner chain, or an error message. */
     public record Reference(int start, int end, Kind kind, String body) {}
@@ -41,6 +41,7 @@ public final class Expander {
     static final String NOT_PLAIN = "a value from a player can only be one plain word or a list of numbers here";
 
     private static final Pattern NAME = Pattern.compile("(?:(?:my|global)\\.)?[A-Za-z_][A-Za-z0-9_]*");
+    private static final Pattern POSITIONAL_BRACE = Pattern.compile("([1-9])(?::-(.*))?", Pattern.DOTALL);
 
     private Expander() {}
 
@@ -50,6 +51,11 @@ public final class Expander {
 
     /** With {@code placeholders}, pipe placeholders (and {@code \\{x}} escapes) are references too. */
     public static List<Reference> scan(String text, boolean placeholders) {
+        return scan(text, placeholders, false);
+    }
+
+    /** With {@code positionals} (inside an alias body), {@code $1}…{@code $9}, {@code $@}, {@code $#}, {@code ${N:-d}} are references. */
+    public static List<Reference> scan(String text, boolean placeholders, boolean positionals) {
         List<Reference> references = new ArrayList<>();
         boolean inDouble = false;
         int i = 0;
@@ -95,7 +101,7 @@ public final class Expander {
                 continue;
             }
             if (c == '$') {
-                Reference reference = reference(text, i);
+                Reference reference = reference(text, i, positionals);
                 if (reference != null) {
                     references.add(reference);
                     i = reference.end();
@@ -107,13 +113,21 @@ public final class Expander {
         return references;
     }
 
-    private static Reference reference(String text, int i) {
+    /** Whether an alias body uses positional references (if not, call arguments are appended to it). */
+    public static boolean hasPositionals(String text) {
+        return scan(text, false, true).stream().anyMatch(reference -> reference.kind() == Kind.POSITIONAL);
+    }
+
+    private static Reference reference(String text, int i, boolean positionals) {
         if (i + 1 >= text.length()) {
             return null;
         }
         char next = text.charAt(i + 1);
         if (next == '?') {
             return new Reference(i, i + 2, Kind.STATUS, "?");
+        }
+        if (positionals && (next == '@' || next == '#' || (next >= '1' && next <= '9'))) {
+            return new Reference(i, i + 2, Kind.POSITIONAL, String.valueOf(next));
         }
         if (next == '(') {
             int close = Quotes.substitutionEnd(text, i);
@@ -126,10 +140,32 @@ public final class Expander {
             if (close >= 0 && NAME.matcher(text.substring(i + 2, close)).matches()) {
                 return new Reference(i, close + 1, Kind.VARIABLE, text.substring(i + 2, close));
             }
+            if (positionals && close >= 0 && POSITIONAL_BRACE.matcher(text.substring(i + 2, close)).matches()) {
+                return new Reference(i, close + 1, Kind.POSITIONAL, text.substring(i + 2, close));
+            }
             return new Reference(i, close < 0 ? text.length() : close + 1, Kind.BAD, "bad ${…}");
         }
         Matcher m = NAME.matcher(text).region(i + 1, text.length());
         return m.lookingAt() ? new Reference(i, m.end(), Kind.VARIABLE, m.group()) : null;
+    }
+
+    private static String positional(String body, List<String> words) throws ExpansionException {
+        if (body.equals("@")) {
+            return String.join(" ", words);
+        }
+        if (body.equals("#")) {
+            return Integer.toString(words.size());
+        }
+        Matcher m = POSITIONAL_BRACE.matcher(body);
+        m.matches();
+        int index = m.group(1).charAt(0) - '1';
+        if (index < words.size()) {
+            return words.get(index);
+        }
+        if (m.group(2) != null) {
+            return m.group(2);
+        }
+        throw new ExpansionException("$" + m.group(1) + " is not set");
     }
 
     public static String expand(String text, Variables variables, int lastStatus, Substituter substituter) throws ExpansionException {
@@ -187,7 +223,13 @@ public final class Expander {
 
     public static Expansion expandParts(String text, Variables variables, int lastStatus, Substituter substituter,
                                         PipeInput input) throws ExpansionException {
-        List<Reference> references = scan(text, input != null);
+        return expandParts(text, variables, lastStatus, substituter, input, null);
+    }
+
+    /** @param positionals the alias call's words while an alias body runs, else null */
+    public static Expansion expandParts(String text, Variables variables, int lastStatus, Substituter substituter,
+                                        PipeInput input, List<String> positionals) throws ExpansionException {
+        List<Reference> references = scan(text, input != null, positionals != null);
         if (references.size() > MAX_REFERENCES) {
             throw new ExpansionException("too many $ references (max " + MAX_REFERENCES + ")");
         }
@@ -212,6 +254,7 @@ public final class Expander {
                     placed = true;
                     yield new Part(checked(placeholder(reference.body(), input), variables.elevated()), true);
                 }
+                case POSITIONAL -> new Part(checked(positional(reference.body(), positionals), variables.elevated()), true);
                 default -> throw new ExpansionException(reference.body());
             };
             parts.add(part);
