@@ -34,6 +34,12 @@ public class BashcraftSurfaceCheck implements FabricClientGameTest {
             server.runCommand("execute if score @p t matches 4 run setblock 0 300 0 minecraft:stone");
             check(!server.computeOnServer(s -> s.overworld().getBlockState(new BlockPos(0, 300, 0)).is(Blocks.STONE)),
                     "a non-op player's surface is refused");
+
+            server.runCommand("worldborder set 100");
+            server.runCommand("sh echo 1000 ~ 1000 | surface && setblock 0 300 1 minecraft:stone");
+            server.runCommand("worldborder set 59999968");
+            check(!server.computeOnServer(s -> s.overworld().getBlockState(new BlockPos(0, 300, 1)).is(Blocks.STONE)),
+                    "surface never loads chunks outside the world border");
         }
     }
 }

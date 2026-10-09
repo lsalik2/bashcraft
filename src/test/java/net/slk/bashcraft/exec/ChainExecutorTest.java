@@ -605,4 +605,12 @@ class ChainExecutorTest {
         assertEquals(List.of("[2] surface needs operator permission"), r.errors);
         assertEquals(List.of("say refused"), r.ran);
     }
+
+    @Test
+    void surfaceRefusesCoordinatesOutsideTheWorldBeforeConvertingThem() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "echo -10000000000 ~ 0 | surface ; echo 0 ~ 99999999999999999999 | surface ; echo 30000000 ~ 0 | surface");
+        assertEquals(List.of("[2] surface: outside the world", "[4] surface: outside the world", "[6] surface: outside the world"), r.errors);
+        assertTrue(r.surfaced.isEmpty(), "the runner must never be asked for an out-of-world column");
+    }
 }

@@ -20,6 +20,9 @@ public final class ChainExecutor {
      */
     private static final java.util.regex.Pattern RUNS_COMMANDS = java.util.regex.Pattern.compile("(?<!\\S)(?:sh|function|run)(?!\\S)");
 
+    /** Block coordinates beyond this are outside any Minecraft world. */
+    private static final double WORLD_LIMIT = 29_999_984;
+
     private final CommandRunner runner;
     private final Variables variables;
     private final boolean swallowPipedOutput;
@@ -286,8 +289,15 @@ public final class ChainExecutor {
                 runner.reportError(label(command) + "surface needs absolute x and z");
                 return ExecResult.failure();
             }
-            int x = (int) Math.floor(Double.parseDouble(xyz.get(0)));
-            int z = (int) Math.floor(Double.parseDouble(xyz.get(2)));
+            double exactX = Double.parseDouble(xyz.get(0));
+            double exactZ = Double.parseDouble(xyz.get(2));
+            // Range-check before converting: a huge value would saturate to Integer.MIN_VALUE, whose abs() is negative.
+            if (!(Math.abs(exactX) <= WORLD_LIMIT) || !(Math.abs(exactZ) <= WORLD_LIMIT)) {
+                runner.reportError(label(command) + "surface: outside the world");
+                return ExecResult.failure();
+            }
+            int x = (int) Math.floor(exactX);
+            int z = (int) Math.floor(exactZ);
             java.util.OptionalInt y = runner.surfaceY(x, z, options);
             if (y.isEmpty()) {
                 return ExecResult.failure();

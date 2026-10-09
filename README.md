@@ -102,8 +102,8 @@ and `store storage ID PATH` run the matching vanilla command as you, so they nee
 
 `surface` replaces the Y of piped coordinates with the ground height there (ignoring leaves), so
 `/sh locate structure #minecraft:village | surface | tp @s` lands you on the ground instead of keeping your height.
-It loads that chunk (generating it if needed), so it needs operator permission, like `/locate`, and it isn't available
-in dimensions with a ceiling such as the Nether. `echo 100 ~ -20 | surface` works too.
+It loads that chunk (generating it if needed), so it needs operator permission, like `/locate`, never reaches beyond
+the world border, and isn't available in dimensions with a ceiling such as the Nether. `echo 100 ~ -20 | surface` works too.
 
 ### Without `/sh`
 

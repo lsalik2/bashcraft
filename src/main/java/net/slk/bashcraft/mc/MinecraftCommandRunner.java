@@ -69,9 +69,6 @@ public final class MinecraftCommandRunner implements CommandRunner {
         return new ExecResult(true, 1, output);
     }
 
-    /** World coordinates beyond this are outside the world border's maximum. */
-    private static final int WORLD_LIMIT = 29_999_984;
-
     @Override
     public OptionalInt surfaceY(int x, int z, RunOptions options) {
         String prefix = prefix(options);
@@ -85,8 +82,9 @@ public final class MinecraftCommandRunner implements CommandRunner {
             reportError(prefix + "surface doesn't work in dimensions with a ceiling");
             return OptionalInt.empty();
         }
-        if (Math.abs(x) > WORLD_LIMIT || Math.abs(z) > WORLD_LIMIT) {
-            reportError(prefix + "surface: outside the world");
+        // The world border is how servers limit chunk generation; never generate beyond it.
+        if (!level.getWorldBorder().isWithinBounds(x + 0.5, z + 0.5)) {
+            reportError(prefix + "surface: outside the world border");
             return OptionalInt.empty();
         }
         level.getChunk(SectionPos.blockToSectionCoord(x), SectionPos.blockToSectionCoord(z));
