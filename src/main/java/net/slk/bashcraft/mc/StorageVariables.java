@@ -1,6 +1,8 @@
 package net.slk.bashcraft.mc;
 
+import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
@@ -8,6 +10,7 @@ import net.minecraft.world.level.storage.CommandStorage;
 import net.slk.bashcraft.exec.ExpansionException;
 import net.slk.bashcraft.exec.VariableTable;
 import net.slk.bashcraft.exec.Variables;
+import net.slk.bashcraft.mixin.CommandSourceStackAccessor;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -15,22 +18,41 @@ import java.util.Optional;
 
 /**
  * Chain variables in command storage {@code bashcraft:vars} = {@code {global:{…}, players:{"<uuid>":{…}}}} (spec C1 §5).
- * A source whose entity is a player has that player's own set; every other source's own set is the global one.
+ * {@code my.} names use the source entity's player's set (the global set when there is no player). Unscoped names use
+ * the player's set first only when that player typed the chain; elevated chains ({@code execute as}, functions,
+ * command blocks) read the global set, so a player can't shadow what they rely on. Only sources with operator
+ * permission may write the global set, since elevated chains run commands built from it.
  */
 public final class StorageVariables implements Variables {
     private static final Identifier ID = Identifier.fromNamespaceAndPath("bashcraft", "vars");
 
     private final CommandStorage storage;
     private final String player;
+    private final boolean preferMine;
+    private final boolean globalWritable;
 
-    private StorageVariables(CommandStorage storage, String player) {
+    private StorageVariables(CommandStorage storage, String player, boolean preferMine, boolean globalWritable) {
         this.storage = storage;
         this.player = player;
+        this.preferMine = preferMine;
+        this.globalWritable = globalWritable;
     }
 
     public static StorageVariables of(CommandSourceStack source) {
-        String player = source.getEntity() instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null;
-        return new StorageVariables(source.getServer().getCommandStorage(), player);
+        ServerPlayer entityPlayer = source.getEntity() instanceof ServerPlayer serverPlayer ? serverPlayer : null;
+        return new StorageVariables(source.getServer().getCommandStorage(),
+                entityPlayer == null ? null : entityPlayer.getUUID().toString(),
+                entityPlayer != null && typedBy(source, entityPlayer),
+                Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source));
+    }
+
+    /** The chain came from this player's own command (through any nesting), not a function or another source. */
+    private static boolean typedBy(CommandSourceStack source, ServerPlayer player) {
+        CommandSource origin = ((CommandSourceStackAccessor) source).bashcraft$source();
+        while (origin instanceof TeeSource tee) {
+            origin = tee.target();
+        }
+        return origin == player.commandSource() && !source.isSilent();
     }
 
     @Override
@@ -46,7 +68,7 @@ public final class StorageVariables implements Variables {
     }
 
     @Override
-    public void unset(Scope scope, String name) {
+    public void unset(Scope scope, String name) throws ExpansionException {
         Loaded loaded = load();
         loaded.table().unset(scope, name);
         save(loaded);
@@ -58,7 +80,7 @@ public final class StorageVariables implements Variables {
         CompoundTag root = storage.get(ID).copy();
         Map<String, String> global = strings(root.getCompoundOrEmpty("global"));
         Map<String, String> own = player == null ? global : strings(root.getCompoundOrEmpty("players").getCompoundOrEmpty(player));
-        return new Loaded(root, own, global, new VariableTable(own, global));
+        return new Loaded(root, own, global, new VariableTable(own, global, preferMine, globalWritable));
     }
 
     private void save(Loaded loaded) {

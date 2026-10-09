@@ -74,9 +74,17 @@ works as before.
 
 - Command storage `bashcraft:vars`: `{global:{NAME:"value",…}, players:{"<uuid>":{NAME:"value",…}}}`; values are
   strings.
-- **Own set:** the player's set when the command source's entity is a `ServerPlayer` (so `execute as @p run sh …`
-  uses that player's set); otherwise the global set (console, command blocks, functions without a player entity).
-- Unscoped read: own set, then global. Unscoped write/unset: own set.
+- **`my.` set:** the player's set when the command source's entity is a `ServerPlayer` (so `execute as @p run sh …`
+  can use that player's set); otherwise the global set (console, command blocks, functions without a player entity).
+- **Unscoped names** use the player's set (read: player's, then global; write: player's) **only when that player typed
+  the chain**. In every other chain — functions, command blocks, the console, `execute as` — unscoped names use the
+  global set, so a player's own variable can never shadow one an elevated chain relies on; such chains reach a
+  player's set only through explicit `my.` names.
+- **Writing the global set** (`global.x=…`, or an unscoped write that lands in it) needs operator (game master)
+  permission: elevated chains build commands from it, so a non-op player must not control it. Error:
+  `global variables need operator permission`.
+- *(Both rules added after a security review on 2026-10-09; the first draft let any player write the global set and
+  let a player's own set shadow it inside `execute as` chains.)*
 - **Limits:** at most 256 variables per set and 1024 characters per value; exceeding either fails the command
   (`[n] too many variables` / `[n] value longer than 1024 characters`).
 

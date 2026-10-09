@@ -164,7 +164,7 @@ public final class ChainExecutor {
         }
 
         private ExecResult assign(Node.Command command, String name, String value) {
-            Variables.Ref ref = Variables.ref(name, Variables.Scope.OWN);
+            Variables.Ref ref = Variables.ref(name, Variables.Scope.ANY);
             try {
                 variables.set(ref.scope(), ref.name(), value);
                 return new ExecResult(true, 1, List.of());
@@ -179,9 +179,14 @@ public final class ChainExecutor {
                 runner.reportError(label(command) + "unset: bad name " + name);
                 return ExecResult.failure();
             }
-            Variables.Ref ref = Variables.ref(name, Variables.Scope.OWN);
-            variables.unset(ref.scope(), ref.name());
-            return new ExecResult(true, 1, List.of());
+            Variables.Ref ref = Variables.ref(name, Variables.Scope.ANY);
+            try {
+                variables.unset(ref.scope(), ref.name());
+                return new ExecResult(true, 1, List.of());
+            } catch (ExpansionException e) {
+                runner.reportError(label(command) + e.getMessage());
+                return ExecResult.failure();
+            }
         }
 
         /** Runs the chain inside $( … ) with its output hidden and returns the value extracted from it. */

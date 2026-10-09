@@ -29,8 +29,17 @@ public class BashcraftVariableCheck implements FabricClientGameTest {
             server.runCommand("execute as @p run sh my.p=3");
             server.runCommand("sh setblock $p 120 10 minecraft:stone || setblock 4 120 10 minecraft:stone");
             check(!stone(server, 3, 10) && stone(server, 4, 10), "the console can't see a player's own variables");
-            server.runCommand("execute as @p run sh setblock $p 120 12 minecraft:stone");
-            check(stone(server, 3, 12), "the player sees their own variable");
+            server.runCommand("execute as @p run sh setblock $my.p 120 12 minecraft:stone");
+            check(stone(server, 3, 12), "an elevated chain reads a player's set when it asks for my.");
+
+            // Typed by the (non-op) test player.
+            context.runOnClient(client -> client.getConnection().sendCommand("sh global.g=1"));
+            context.runOnClient(client -> client.getConnection().sendCommand("sh x=9"));
+            context.waitTicks(5);
+            server.runCommand("execute unless data storage bashcraft:vars global.g run setblock 10 120 13 minecraft:stone");
+            check(stone(server, 10, 13), "a non-op player can't write the global set");
+            server.runCommand("execute as @p run sh setblock $x 120 13 minecraft:stone");
+            check(stone(server, 1, 13) && !stone(server, 9, 13), "a player's own x doesn't shadow the global x in an elevated chain");
 
             server.runCommand("scoreboard players set n bc 5");
             server.runCommand("sh setblock $(scoreboard players get n bc) 120 10 minecraft:stone");

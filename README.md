@@ -56,8 +56,9 @@ uses a group, a stray `)` anywhere in it is an error rather than text.
 /sh say done ; say status was $?
 ```
 
-`$x` / `${x}` read a variable; `my.x` and `global.x` pick a set (players have their own, the console, command
-blocks and functions share the global one; `$x` checks your own first). `$?` is `0` if the previous command
+`$x` / `${x}` read a variable; `my.x` and `global.x` pick a set. When you type a chain yourself, `x` means your own
+set (falling back to the global one); in functions, command blocks, the console and `execute as … run sh`, `x` means
+the global set and a player's set is reached only as `my.x`. Writing the global set needs operator permission. `$?` is `0` if the previous command
 succeeded, else `1`. `$( … )` runs a chain and inserts its value like a pipe would. `unset x` removes a variable and
 `echo text` prints it (and can be piped). Variables persist in command storage `bashcraft:vars`
 (`global` and `players.<uuid>`), so datapacks can use them with `/data`. Expansion works in `"…"` but not in `'…'`;

@@ -12,7 +12,7 @@ public interface Variables {
 
     void set(Scope scope, String name, String value) throws ExpansionException;
 
-    void unset(Scope scope, String name);
+    void unset(Scope scope, String name) throws ExpansionException;
 
     /** Splits {@code my.x} / {@code global.x} / {@code x}; an unscoped name gets {@code unscoped}. */
     static Ref ref(String qualified, Scope unscoped) {
