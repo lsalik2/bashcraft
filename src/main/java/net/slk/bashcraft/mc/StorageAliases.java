@@ -11,7 +11,6 @@ import net.slk.bashcraft.exec.AliasTable;
 import net.slk.bashcraft.exec.Aliases;
 import net.slk.bashcraft.exec.ExpansionException;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
@@ -75,7 +74,7 @@ public final class StorageAliases implements Aliases {
         CompoundTag root = server.getCommandStorage().get(ID);
         TreeSet<String> names = new TreeSet<>(root.getCompoundOrEmpty("global").keySet());
         names.addAll(root.getCompoundOrEmpty("players").getCompoundOrEmpty(player.getUUID().toString()).keySet());
-        return new ArrayList<>(names);
+        return AliasTable.callable(names);
     }
 
     /**

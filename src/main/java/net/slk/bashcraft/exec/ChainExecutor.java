@@ -98,14 +98,14 @@ public final class ChainExecutor {
         private boolean budgetExceeded;
         private boolean expansionFailed;
 
-        private final List<String> positionals;
+        private final Arguments positionals;
 
         Run(Map<Node.Command, Integer> numbers, boolean numbered) {
             this(numbers, numbered, null);
         }
 
         /** @param positionals the alias call's words while running an alias body, else null */
-        Run(Map<Node.Command, Integer> numbers, boolean numbered, List<String> positionals) {
+        Run(Map<Node.Command, Integer> numbers, boolean numbered, Arguments positionals) {
             this.numbers = numbers;
             this.numbered = numbered;
             this.positionals = positionals;
@@ -443,9 +443,16 @@ public final class ChainExecutor {
         /** Runs an alias body as a nested chain with the call's words as $1…$9/$@/$#; output shown as usual. */
         private ExecResult callAlias(Node.Command command, String name, String body, Piped input, boolean feedsPipe) {
             String rest = command.text().substring(name.length());
-            List<String> words;
+            // A piped value fills placeholders in the call's arguments if there are any; otherwise it goes to the body.
+            boolean placesInput = input != null && Expander.scan(rest, true).stream()
+                    .anyMatch(reference -> reference.kind() == Expander.Kind.PLACEHOLDER);
+            Arguments words;
             try {
-                words = Words.split(Expander.expandParts(rest, variables, lastStatus, this::substitute, null, positionals).join(false));
+                Expander.Expansion expansion = Expander.expandParts(rest, variables, lastStatus, this::substitute,
+                        placesInput ? new Expander.PipeInput(input.value(), input.result()) : null, positionals);
+                List<Words.Word> spans = Words.spans(expansion.join(false));
+                words = new Arguments(spans.stream().map(Words.Word::text).toList(),
+                        spans.stream().map(word -> expansion.untrustedOverlaps(word.start(), word.end())).toList());
             } catch (ExpansionException e) {
                 expansionFailed = true;
                 runner.reportError(label(command) + e.getMessage());
@@ -458,7 +465,7 @@ public final class ChainExecutor {
                 runner.reportError(label(command) + "alias " + name + ": " + e.getMessage());
                 return ExecResult.failure();
             }
-            if (!words.isEmpty() && !Expander.hasPositionals(body)) {
+            if (!words.words().isEmpty() && !Expander.hasPositionals(body)) {
                 node = appendArguments(node);
             }
             Optional<DepthGuard.Scope> scope = DepthGuard.enter(maxDepth);
@@ -474,7 +481,7 @@ public final class ChainExecutor {
                 }
                 Map<Node.Command, Integer> innerNumbers = new IdentityHashMap<>();
                 number(node, innerNumbers);
-                return new Run(innerNumbers, false, words).node(node, input, feedsPipe).result();
+                return new Run(innerNumbers, false, words).node(node, placesInput ? null : input, feedsPipe).result();
             }
         }
 

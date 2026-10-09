@@ -714,8 +714,32 @@ class ChainExecutorTest {
     void aliasArgumentsInElevatedChainsMustBePlain() throws Exception {
         FakeRunner r = new FakeRunner();
         AliasTable shared = new AliasTable(new HashMap<>(), new HashMap<>(), false, true, name -> false);
-        run(r, new ShellContext(elevated(Map.of(), Map.of()), shared, null), "alias global.s = 'say $1' ; s 'a\"b'", 8);
+        run(r, new ShellContext(elevated(Map.of("nick", "a\"b"), Map.of()), shared, null), "alias global.s = 'say $1' ; s $my.nick", 8);
         assertTrue(r.errors.getFirst().contains("a value from a player can only be one plain word or a list of numbers here"), r.errors.toString());
         assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void globalAliasArgumentsWrittenInAnElevatedChainAreTrusted() throws Exception {
+        FakeRunner r = new FakeRunner();
+        AliasTable shared = new AliasTable(new HashMap<>(), new HashMap<>(), false, true, name -> false);
+        run(r, new ShellContext(elevated(Map.of(), Map.of()), shared, null),
+                "alias global.heal = 'effect give $1 regeneration 5 ${2:-@s}' ; heal @s 3 ; heal @p ; alias global.g = gamemode ; g creative @s", 8);
+        assertEquals(List.of(), r.errors);
+        assertEquals(List.of("effect give @s regeneration 5 3", "effect give @p regeneration 5 @s", "gamemode creative @s"), r.ran);
+    }
+
+    @Test
+    void pipePlaceholdersInAliasArguments() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "alias p = 'say $1 $2' ; echo 5 | p {value} 2 ; alias s = say ; echo 6 | s", 8);
+        assertEquals(List.of("say 5 2", "say 6"), r.ran);
+    }
+
+    @Test
+    void positionalsInsideSubstitutionsCountForTheAppendRule() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "alias f = 'say $(echo $1)' ; f a", 8);
+        assertEquals(List.of("say a"), r.ran);
     }
 }

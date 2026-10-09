@@ -96,7 +96,7 @@ class ExpanderTest {
     }
 
     private static String positional(String text, List<String> words) throws ExpansionException {
-        return Expander.expandParts(text, vars(), 0, chain -> "", null, words).join(false);
+        return Expander.expandParts(text, vars(), 0, chain -> "", null, Arguments.of(words)).join(false);
     }
 
     @Test
@@ -112,5 +112,6 @@ class ExpanderTest {
         assertTrue(Expander.hasPositionals("say $1"));
         assertTrue(Expander.hasPositionals("say ${2:-x} && b"));
         assertFalse(Expander.hasPositionals("say $x '$1'"));
+        assertTrue(Expander.hasPositionals("say $(echo $1)"));
     }
 }

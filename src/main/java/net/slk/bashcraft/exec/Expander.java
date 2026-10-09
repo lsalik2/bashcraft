@@ -115,7 +115,13 @@ public final class Expander {
 
     /** Whether an alias body uses positional references (if not, call arguments are appended to it). */
     public static boolean hasPositionals(String text) {
-        return scan(text, false, true).stream().anyMatch(reference -> reference.kind() == Kind.POSITIONAL);
+        for (Reference reference : scan(text, false, true)) {
+            if (reference.kind() == Kind.POSITIONAL
+                    || (reference.kind() == Kind.SUBSTITUTION && hasPositionals(reference.body()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Reference reference(String text, int i, boolean positionals) {
@@ -149,21 +155,25 @@ public final class Expander {
         return m.lookingAt() ? new Reference(i, m.end(), Kind.VARIABLE, m.group()) : null;
     }
 
-    private static String positional(String body, List<String> words) throws ExpansionException {
+    /** A word keeps the trust it had in the call; a default is the alias body's own text. */
+    private static Part positional(String body, Arguments arguments, boolean elevated) throws ExpansionException {
+        List<String> words = arguments.words();
         if (body.equals("@")) {
-            return String.join(" ", words);
+            boolean untrusted = arguments.anyUntrusted();
+            return new Part(checked(String.join(" ", words), elevated && untrusted), true, !untrusted);
         }
         if (body.equals("#")) {
-            return Integer.toString(words.size());
+            return new Part(Integer.toString(words.size()), true, true);
         }
         Matcher m = POSITIONAL_BRACE.matcher(body);
         m.matches();
         int index = m.group(1).charAt(0) - '1';
         if (index < words.size()) {
-            return words.get(index);
+            boolean untrusted = arguments.untrusted().get(index);
+            return new Part(checked(words.get(index), elevated && untrusted), true, !untrusted);
         }
         if (m.group(2) != null) {
-            return m.group(2);
+            return new Part(m.group(2), true, true);
         }
         throw new ExpansionException("$" + m.group(1) + " is not set");
     }
@@ -183,7 +193,15 @@ public final class Expander {
     }
 
     /** One piece of an expanded command: the author's own text, or a value inserted by expansion or a pipe. */
-    public record Part(String text, boolean inserted) {}
+    /**
+     * @param inserted a value put into the text (escaped where the command can run commands)
+     * @param trusted  not player-controlled in an elevated chain (so alias words made from it need not be plain)
+     */
+    public record Part(String text, boolean inserted, boolean trusted) {
+        public Part(String text, boolean inserted) {
+            this(text, inserted, !inserted);
+        }
+    }
 
     /** An expanded command that remembers which parts were inserted, so callers can decide how to treat them. */
     public static final class Expansion {
@@ -209,10 +227,19 @@ public final class Expander {
 
         /** Whether {@code [start, end)} of the unescaped text overlaps an inserted value. */
         public boolean insertedOverlaps(int start, int end) {
+            return overlaps(start, end, false);
+        }
+
+        /** Whether {@code [start, end)} of the unescaped text overlaps an inserted value that isn't trusted. */
+        public boolean untrustedOverlaps(int start, int end) {
+            return overlaps(start, end, true);
+        }
+
+        private boolean overlaps(int start, int end, boolean untrustedOnly) {
             int position = 0;
             for (Part part : parts) {
                 int partEnd = position + part.text().length();
-                if (part.inserted() && position < end && start < partEnd) {
+                if (part.inserted() && !(untrustedOnly && part.trusted()) && position < end && start < partEnd) {
                     return true;
                 }
                 position = partEnd;
@@ -228,7 +255,7 @@ public final class Expander {
 
     /** @param positionals the alias call's words while an alias body runs, else null */
     public static Expansion expandParts(String text, Variables variables, int lastStatus, Substituter substituter,
-                                        PipeInput input, List<String> positionals) throws ExpansionException {
+                                        PipeInput input, Arguments positionals) throws ExpansionException {
         List<Reference> references = scan(text, input != null, positionals != null);
         if (references.size() > MAX_REFERENCES) {
             throw new ExpansionException("too many $ references (max " + MAX_REFERENCES + ")");
@@ -242,19 +269,20 @@ public final class Expander {
             Part part = switch (reference.kind()) {
                 case ESCAPED_DOLLAR -> new Part("$", false);
                 case ESCAPED_PLACEHOLDER -> new Part(reference.body(), false);
-                case STATUS -> new Part(Integer.toString(lastStatus), true);
+                case STATUS -> new Part(Integer.toString(lastStatus), true, true);
                 case VARIABLE -> {
                     Variables.Ref ref = Variables.ref(reference.body(), Variables.Scope.ANY);
                     String value = variables.get(ref.scope(), ref.name())
                             .orElseThrow(() -> new ExpansionException("$" + reference.body() + " is not set"));
-                    yield new Part(checked(value, !variables.trusted(ref.scope(), ref.name())), true);
+                    boolean trusted = variables.trusted(ref.scope(), ref.name());
+                    yield new Part(checked(value, !trusted), true, trusted);
                 }
-                case SUBSTITUTION -> new Part(checked(substituter.run(reference.body()), variables.elevated()), true);
+                case SUBSTITUTION -> new Part(checked(substituter.run(reference.body()), variables.elevated()), true, !variables.elevated());
                 case PLACEHOLDER -> {
                     placed = true;
-                    yield new Part(checked(placeholder(reference.body(), input), variables.elevated()), true);
+                    yield new Part(checked(placeholder(reference.body(), input), variables.elevated()), true, !variables.elevated());
                 }
-                case POSITIONAL -> new Part(checked(positional(reference.body(), positionals), variables.elevated()), true);
+                case POSITIONAL -> positional(reference.body(), positionals, variables.elevated());
                 default -> throw new ExpansionException(reference.body());
             };
             parts.add(part);
@@ -268,7 +296,7 @@ public final class Expander {
         if (input != null && !placed) {
             stripTrailing(parts);
             parts.add(new Part(" ", false));
-            parts.add(new Part(checked(input.value().asArgument(), variables.elevated()), true));
+            parts.add(new Part(checked(input.value().asArgument(), variables.elevated()), true, !variables.elevated()));
         }
         Expansion expansion = new Expansion(parts);
         expansion.join(false);
@@ -281,7 +309,7 @@ public final class Expander {
             Part last = parts.removeLast();
             String stripped = last.text().stripTrailing();
             if (!stripped.isEmpty()) {
-                parts.add(new Part(stripped, last.inserted()));
+                parts.add(new Part(stripped, last.inserted(), last.trusted()));
                 return;
             }
         }

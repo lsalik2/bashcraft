@@ -14,6 +14,7 @@ public final class AliasTable implements Aliases {
     public static final int MAX_ALIASES = 64;
     public static final int MAX_BODY = 1024;
     public static final Set<String> BUILTIN_WORDS = Set.of("alias", "unalias", "echo", "unset", "grep", "store", "each", "surface", "history", "sh");
+    public static final int MAX_CALLABLE = 128;
     private static final Pattern NAME = Pattern.compile("[a-z_][a-z0-9_-]{0,31}");
 
     private final Map<String, String> mine;
@@ -36,8 +37,17 @@ public final class AliasTable implements Aliases {
         this.isCommand = isCommand;
     }
 
+    /** Names a client is told about: valid alias names only (storage can be edited by hand), sorted, at most {@link #MAX_CALLABLE}. */
+    public static List<String> callable(java.util.Collection<String> names) {
+        return names.stream().filter(name -> NAME.matcher(name).matches()).distinct().sorted().limit(MAX_CALLABLE).toList();
+    }
+
     @Override
     public Optional<String> body(String name) {
+        // A command registered after the alias was defined (or a name written to storage by hand) wins over the alias.
+        if (BUILTIN_WORDS.contains(name) || isCommand.test(name)) {
+            return Optional.empty();
+        }
         if (minePreferred && mine.containsKey(name)) {
             return Optional.of(mine.get(name));
         }

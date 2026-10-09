@@ -56,4 +56,23 @@ class AliasTableTest {
         table.remove(false, "a1");
         assertEquals(Optional.empty(), table.body("a1"));
     }
+
+    @Test
+    void aliasesNeverShadowCommandsRegisteredLater() {
+        AliasTable table = typed(Map.of("tp", "say mine", "echo", "say x"), Map.of("tp", "say global"));
+        assertEquals(Optional.empty(), table.body("tp"));
+        assertEquals(Optional.empty(), table.body("echo"));
+    }
+
+    @Test
+    void callableNamesAreValidAndCapped() {
+        List<String> many = new java.util.ArrayList<>(List.of("ok", "Bad", "x".repeat(40), "a b"));
+        for (int i = 0; i < 300; i++) {
+            many.add("n" + i);
+        }
+        List<String> names = AliasTable.callable(many);
+        assertTrue(names.stream().allMatch(name -> name.matches("[a-z_][a-z0-9_-]{0,31}")), names.toString());
+        assertEquals(List.of("ok"), AliasTable.callable(List.of("ok", "Bad", "x".repeat(40), "a b")));
+        assertEquals(AliasTable.MAX_CALLABLE, names.size());
+    }
 }
