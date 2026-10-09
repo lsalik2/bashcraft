@@ -1,6 +1,8 @@
 package net.slk.bashcraft.exec;
 
+import net.slk.bashcraft.chain.ChainSyntaxException;
 import net.slk.bashcraft.chain.Node;
+import net.slk.bashcraft.chain.NodeParser;
 import net.slk.bashcraft.pipe.PipeException;
 import net.slk.bashcraft.pipe.PipeResolver;
 import net.slk.bashcraft.pipe.PipeValue;
@@ -9,22 +11,34 @@ import net.slk.bashcraft.pipe.Placeholders;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Runs a chain's syntax tree with bash semantics (spec §5): && / || / ; by status, | feeds extracted values forward, groups nest. */
 public final class ChainExecutor {
     private final CommandRunner runner;
+    private final Variables variables;
     private final boolean swallowPipedOutput;
     private final int maxTotalCommands;
+    private final int maxDepth;
 
     public ChainExecutor(CommandRunner runner, boolean swallowPipedOutput) {
-        this(runner, swallowPipedOutput, Integer.MAX_VALUE);
+        this(runner, Variables.NONE, swallowPipedOutput, Integer.MAX_VALUE, Integer.MAX_VALUE);
     }
 
-    /** @param maxTotalCommands budget shared by this chain and every chain nested inside it (see {@link DepthGuard#spend}) */
     public ChainExecutor(CommandRunner runner, boolean swallowPipedOutput, int maxTotalCommands) {
+        this(runner, Variables.NONE, swallowPipedOutput, maxTotalCommands, Integer.MAX_VALUE);
+    }
+
+    /**
+     * @param maxTotalCommands budget shared by this chain and every chain nested inside it (see {@link DepthGuard#spend})
+     * @param maxDepth         nesting limit for {@code $( … )}, shared with nested {@code sh}
+     */
+    public ChainExecutor(CommandRunner runner, Variables variables, boolean swallowPipedOutput, int maxTotalCommands, int maxDepth) {
         this.runner = runner;
+        this.variables = variables;
         this.swallowPipedOutput = swallowPipedOutput;
         this.maxTotalCommands = maxTotalCommands;
+        this.maxDepth = maxDepth;
     }
 
     /** Returns the outcome of the last command that ran (a skipped item leaves the status unchanged). */
@@ -62,6 +76,7 @@ public final class ChainExecutor {
     private final class Run {
         private final Map<Node.Command, Integer> numbers;
         private final boolean numbered;
+        private int lastStatus;
 
         Run(Map<Node.Command, Integer> numbers, boolean numbered) {
             this.numbers = numbers;
@@ -115,21 +130,85 @@ public final class ChainExecutor {
         }
 
         private Outcome command(Node.Command command, Piped input, boolean feedsPipe) {
-            String text = command.text();
-            if (input != null) {
+            Builtins.Call call = Builtins.classify(command.text());
+            String text = call.argument();
+            if (call.kind() != Builtins.Kind.UNSET) {
                 try {
-                    text = Placeholders.inject(text, input.value(), input.result());
-                } catch (PipeException e) {
+                    text = Expander.expand(text, variables, lastStatus, this::substitute);
+                    if (input != null) {
+                        text = Placeholders.inject(text, input.value(), input.result());
+                    }
+                } catch (ExpansionException | PipeException e) {
                     runner.reportError(label(command) + e.getMessage());
-                    return new Outcome(ExecResult.failure(), command.text());
+                    return finish(ExecResult.failure(), command);
                 }
             }
             if (!DepthGuard.spend(maxTotalCommands)) {
                 runner.reportError(label(command) + "too many commands across nested chains (max " + maxTotalCommands + ")");
-                return new Outcome(ExecResult.failure(), command.text());
+                return finish(ExecResult.failure(), command);
             }
             String prefix = numbered ? label(command) : null;
-            return new Outcome(runner.run(text, new RunOptions(feedsPipe && swallowPipedOutput, prefix)), command.text());
+            RunOptions options = new RunOptions(feedsPipe && swallowPipedOutput, prefix);
+            ExecResult result = switch (call.kind()) {
+                case NONE -> runner.run(text, options);
+                case ECHO -> runner.echo(text, options);
+                case ASSIGN -> assign(command, call.name(), Builtins.unquote(text.strip()));
+                case UNSET -> unset(command, call.name());
+            };
+            return finish(result, command);
+        }
+
+        private Outcome finish(ExecResult result, Node.Command command) {
+            lastStatus = result.success() ? 0 : 1;
+            return new Outcome(result, command.text());
+        }
+
+        private ExecResult assign(Node.Command command, String name, String value) {
+            Variables.Ref ref = Variables.ref(name, Variables.Scope.OWN);
+            try {
+                variables.set(ref.scope(), ref.name(), value);
+                return new ExecResult(true, 1, List.of());
+            } catch (ExpansionException e) {
+                runner.reportError(label(command) + e.getMessage());
+                return ExecResult.failure();
+            }
+        }
+
+        private ExecResult unset(Node.Command command, String name) {
+            if (!name.matches("(?:(?:my|global)\\.)?[A-Za-z_][A-Za-z0-9_]*")) {
+                runner.reportError(label(command) + "unset: bad name " + name);
+                return ExecResult.failure();
+            }
+            Variables.Ref ref = Variables.ref(name, Variables.Scope.OWN);
+            variables.unset(ref.scope(), ref.name());
+            return new ExecResult(true, 1, List.of());
+        }
+
+        /** Runs the chain inside $( … ) with its output hidden and returns the value extracted from it. */
+        private String substitute(String chain) throws ExpansionException {
+            Optional<DepthGuard.Scope> scope = DepthGuard.enter(maxDepth);
+            if (scope.isEmpty()) {
+                throw new ExpansionException("$(…) nested deeper than " + maxDepth);
+            }
+            try (DepthGuard.Scope ignored = scope.get()) {
+                Node node;
+                try {
+                    node = NodeParser.parse(chain, NodeParser.Mode.SH, Integer.MAX_VALUE);
+                } catch (ChainSyntaxException e) {
+                    throw new ExpansionException("$(…): " + e.getMessage());
+                }
+                Map<Node.Command, Integer> innerNumbers = new IdentityHashMap<>();
+                number(node, innerNumbers);
+                ExecResult result = new Run(innerNumbers, false).node(node, null, true).result();
+                if (result.errored()) {
+                    throw new ExpansionException("$(…) produced no value");
+                }
+                try {
+                    return PipeResolver.resolve(result.output()).asArgument();
+                } catch (PipeException e) {
+                    throw new ExpansionException("$(…) produced no value");
+                }
+            }
         }
 
         private String label(Node.Command command) {

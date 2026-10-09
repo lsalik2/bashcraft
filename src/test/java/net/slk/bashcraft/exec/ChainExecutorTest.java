@@ -5,6 +5,9 @@ import net.slk.bashcraft.pipe.Feedback;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -206,5 +209,119 @@ class ChainExecutorTest {
         FakeRunner r = new FakeRunner();
         run(r, "(x ; a) | b");
         assertEquals(List.of("[3] nothing to pipe from /a"), r.errors);
+    }
+
+    private static VariableTable table() {
+        Map<String, String> global = new HashMap<>();
+        return new VariableTable(new HashMap<>(), global);
+    }
+
+    private static ExecResult run(FakeRunner runner, Variables variables, String chain) throws Exception {
+        return new ChainExecutor(runner, variables, true, Integer.MAX_VALUE, 8).execute(NodeParser.parse(chain, NodeParser.Mode.SH, 32));
+    }
+
+    @Test
+    void assignmentIsVisibleToTheNextCommand() throws Exception {
+        FakeRunner r = new FakeRunner();
+        VariableTable v = table();
+        run(r, v, "x=11 && setblock $x 64 0 stone");
+        assertEquals(List.of("setblock 11 64 0 stone"), r.ran);
+        assertEquals(Optional.of("11"), v.get(Variables.Scope.OWN, "x"));
+    }
+
+    @Test
+    void quotesAreStrippedAndScopesHonoured() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "home=\"0 80 0\" ; global.k=3 ; my.k=4 ; tp @s $home ; say $k $global.k");
+        assertEquals(List.of("tp @s 0 80 0", "say 4 3"), r.ran);
+    }
+
+    @Test
+    void unsetVariableFailsOnlyThatCommand() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "say $nope || say fallback");
+        assertEquals(List.of("[1] $nope is not set"), r.errors);
+        assertEquals(List.of("say fallback"), r.ran);
+    }
+
+    @Test
+    void statusOfThePreviousCommand() throws Exception {
+        FakeRunner r = new FakeRunner().on("a", FAIL);
+        run(r, table(), "say $? ; a ; say $?");
+        assertEquals(List.of("say 0", "a", "say 1"), r.ran);
+    }
+
+    @Test
+    void substitutionInsertsTheExtractedValueAndHidesItsOutput() throws Exception {
+        FakeRunner r = new FakeRunner().on("locate structure #minecraft:village", new ExecResult(true, 845, List.of(locateVillage())));
+        run(r, table(), "tp @s $(locate structure #minecraft:village)");
+        assertEquals(List.of("locate structure #minecraft:village", "tp @s 312 ~ -1040"), r.ran);
+        assertTrue(r.options.get(0).swallowSuccess());
+        assertFalse(r.options.get(1).swallowSuccess());
+    }
+
+    @Test
+    void substitutionWithoutAValueFails() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "say $(say hi) || say x");
+        assertEquals(List.of("[1] $(…) produced no value"), r.errors);
+        assertEquals(List.of("say hi", "say x"), r.ran);
+    }
+
+    @Test
+    void unsetBuiltin() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "x=1 ; unset x ; say $x");
+        assertEquals(List.of("[3] $x is not set"), r.errors);
+    }
+
+    @Test
+    void echoIsPipeable() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "x=7 ; echo $x | scoreboard players set n obj");
+        assertEquals(List.of("7"), r.echoed);
+        assertEquals(List.of("scoreboard players set n obj 7"), r.ran);
+    }
+
+    @Test
+    void assignmentFromAPipe() throws Exception {
+        FakeRunner r = new FakeRunner().on("locate structure #minecraft:village", new ExecResult(true, 845, List.of(locateVillage())));
+        VariableTable v = table();
+        run(r, v, "locate structure #minecraft:village | home=");
+        assertEquals(Optional.of("312 ~ -1040"), v.get(Variables.Scope.OWN, "home"));
+    }
+
+    @Test
+    void expandedValuesAreNotReparsed() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "x='a && /b' ; say $x");
+        assertEquals(List.of("say a && /b"), r.ran);
+    }
+
+    @Test
+    void substitutionDepthIsLimited() throws Exception {
+        FakeRunner r = new FakeRunner();
+        new ChainExecutor(r, table(), true, Integer.MAX_VALUE, 2).execute(NodeParser.parse("say $(echo $(echo $(echo 1)))", NodeParser.Mode.SH, 32));
+        // The innermost failure is reported first; each enclosing $( … ) then reports that it got no value.
+        assertEquals("$(…) nested deeper than 2", r.errors.getFirst());
+        assertTrue(r.echoed.isEmpty());
+        assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void substitutionCommandsCountTowardTheBudget() throws Exception {
+        try (DepthGuard.Scope outer = DepthGuard.enter(8).orElseThrow()) {
+            FakeRunner r = new FakeRunner();
+            new ChainExecutor(r, table(), true, 2, 8).execute(NodeParser.parse("say $(echo 1 ; echo 2)", NodeParser.Mode.SH, 32));
+            assertEquals(List.of("1", "2"), r.echoed);
+            assertEquals(List.of("too many commands across nested chains (max 2)"), r.errors);
+        }
+    }
+
+    @Test
+    void withoutVariablesAssignmentIsAnError() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, "x=1");
+        assertEquals(List.of("variables are not available here"), r.errors);
     }
 }

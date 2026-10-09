@@ -28,4 +28,13 @@ final class FakeRunner implements CommandRunner {
     public void reportError(String message) {
         errors.add(message);
     }
+
+    final List<String> echoed = new ArrayList<>();
+
+    @Override
+    public ExecResult echo(String text, RunOptions options) {
+        echoed.add(text);
+        this.options.add(options);
+        return new ExecResult(true, 1, List.of(net.slk.bashcraft.pipe.Feedback.plain(text)));
+    }
 }

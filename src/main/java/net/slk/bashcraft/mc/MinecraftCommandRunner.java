@@ -56,6 +56,11 @@ public final class MinecraftCommandRunner implements CommandRunner {
     }
 
     @Override
+    public ExecResult echo(String text, RunOptions options) {
+        throw new UnsupportedOperationException("echo is wired up in Task 4");
+    }
+
+    @Override
     public void reportError(String message) {
         invoker.sendFailure(Component.literal("BashCraft: " + message));
     }

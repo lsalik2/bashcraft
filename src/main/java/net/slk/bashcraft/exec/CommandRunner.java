@@ -7,4 +7,7 @@ public interface CommandRunner {
 
     /** Shows a BashCraft error (one not produced by a command) to the user. */
     void reportError(String message);
+
+    /** Sends {@code text} to the user as ordinary success output (so it can be piped), honouring {@code options}. */
+    ExecResult echo(String text, RunOptions options);
 }
