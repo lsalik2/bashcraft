@@ -132,8 +132,10 @@ quote opens).
 **Plain-value rule (2026-10-09, after the injection review).** Escaping can't protect every parser a value later
 reaches (JSON text components, SNBT, selectors, macros, other mods' commands). So in an *elevated* chain — one not
 typed by the player it reads from: functions, command blocks, the console, `execute as … run sh` — every
-player-controlled value must be plain text matching `[A-Za-z0-9 _.:~^+-]*`, or the command fails with `a value from a
-player can only be plain text here (letters, digits, spaces and _ . : ~ ^ + -)`. Player-controlled means: a variable
+player-controlled value must be either one word matching `[A-Za-z0-9_.:~^+-]*` (no spaces, so it fills exactly one
+argument and can't add keywords such as `store`, `if` or `as`), or only numbers and relative coordinates separated by
+single spaces (`312 ~ -1040`, `^ ^1.5 ^`); otherwise the command fails with `a value from a player can only be one
+plain word or a list of numbers here`. Player-controlled means: a variable
 read from a player's own set, and any pipe value, placeholder or `$( … )` output. Global-set values (written only by
 operators) and everything in a chain the player typed themselves are not restricted. The check applies to builtins
 too, so player text can't be copied into the global set. The escaping above remains as a second layer.

@@ -73,9 +73,10 @@ and 32767 characters per expanded command. `$` reads only string values; other d
 **Security notes:**
 - Anyone can read the global set with `echo $global.x`; don't keep secrets there.
 - In functions, command blocks, the console and `execute as … run sh`, player-controlled values — `$my.x`, pipe
-  values, placeholders and `$( … )` output — must be plain text (letters, digits, spaces and `_ . : ~ ^ + -`), or the
-  command is refused. That stops a player's text from breaking out of JSON (`{"text":"…"}`), NBT or selectors. A plain
-  value can still change a command's arguments (`give @s $my.item` with `diamond 64`), so check values you rely on.
+  values, placeholders and `$( … )` output — must be one plain word (letters, digits and `_ . : ~ ^ + -`, no spaces)
+  or only numbers and coordinates (`312 ~ -1040`), or the command is refused. That stops a player's text from breaking
+  out of JSON (`{"text":"…"}`), NBT or selectors, or adding arguments such as `store …`. A plain value still chooses
+  its one argument (`give @s $my.item`), so check values you rely on.
 - Values inserted into a command that can run other commands — `sh …`, anything with `run` (`execute … run …`,
   `return run …`), `function …` (macro arguments), or a command whose name is itself a `$` reference — are escaped, so
   an inner chain or macro sees them as plain text, never as `&&`, `;`, `$( … )`; a value containing a quote is refused

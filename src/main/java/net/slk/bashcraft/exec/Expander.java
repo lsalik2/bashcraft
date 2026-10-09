@@ -32,9 +32,13 @@ public final class Expander {
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{(x|y|z|value|result)}");
     private static final String ESCAPED_IN_NESTED = "\\&|;()$";
-    /** What player-controlled text may look like in an elevated chain: no quotes, brackets, braces, operators, @ or \\. */
-    private static final Pattern PLAIN = Pattern.compile("[A-Za-z0-9 _.:~^+\\-]*");
-    static final String NOT_PLAIN = "a value from a player can only be plain text here (letters, digits, spaces and _ . : ~ ^ + -)";
+    /**
+     * What player-controlled text may look like in an elevated chain: one word with no quotes, brackets, braces,
+     * operators, @ or \\ (so it fills exactly one argument and can't add keywords like store/if/as), or only numbers and
+     * relative coordinates separated by single spaces ({@code 312 ~ -1040}, {@code ^ ^1.5 ^}).
+     */
+    private static final Pattern PLAIN = Pattern.compile("[A-Za-z0-9_.:~^+\\-]*|(?:[~^]?[-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)?)(?: (?:[~^]?[-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)?))+");
+    static final String NOT_PLAIN = "a value from a player can only be one plain word or a list of numbers here";
 
     private static final Pattern NAME = Pattern.compile("(?:(?:my|global)\\.)?[A-Za-z_][A-Za-z0-9_]*");
 

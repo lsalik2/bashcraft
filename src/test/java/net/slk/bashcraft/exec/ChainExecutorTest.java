@@ -409,7 +409,7 @@ class ChainExecutorTest {
     void elevatedChainsRefuseStructuredPlayerText() throws Exception {
         FakeRunner r = new FakeRunner();
         run(r, elevated(Map.of("nick", JSON_ATTACK), Map.of()), "tellraw @a {\"text\":\"$my.nick\"}");
-        assertEquals(List.of("a value from a player can only be plain text here (letters, digits, spaces and _ . : ~ ^ + -)"), r.errors);
+        assertEquals(List.of("a value from a player can only be one plain word or a list of numbers here"), r.errors);
         assertTrue(r.ran.isEmpty());
     }
 
@@ -425,7 +425,7 @@ class ChainExecutorTest {
         FakeRunner r = new FakeRunner().on("get", new ExecResult(true, 1, List.of(Feedback.plain("a\"b"))));
         run(r, elevated(Map.of(), Map.of()), "get | say {value} ; say $(echo x{y) ; echo 7 | say {value}");
         assertEquals(2, r.errors.size());
-        assertTrue(r.errors.stream().allMatch(e -> e.contains("a value from a player can only be plain text here")));
+        assertTrue(r.errors.stream().allMatch(e -> e.contains("a value from a player can only be one plain word or a list of numbers here")));
         assertEquals(List.of("get", "say 7"), r.ran);
     }
 
@@ -446,5 +446,21 @@ class ChainExecutorTest {
         FakeRunner own = new FakeRunner();
         run(own, table(), "x='a\"b' ; say $x");
         assertEquals(List.of("say a\"b"), own.ran);
+    }
+
+    @Test
+    void elevatedPlayerValuesCantAddArguments() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, elevated(Map.of("n", "1 store result storage bashcraft:vars global.x int 1"), Map.of()),
+                "execute if score @p s matches $my.n run say hi");
+        assertEquals(List.of("[1] a value from a player can only be one plain word or a list of numbers here").getFirst().substring(4), r.errors.getFirst());
+        assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void elevatedPlayerCoordinatesStillWork() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, elevated(Map.of("a", "312 ~ -1040", "b", "^ ^1.5 ^", "c", "~-2 +3 .5"), Map.of()), "tp @s $my.a ; tp @s $my.b ; tp @s $my.c");
+        assertEquals(List.of("tp @s 312 ~ -1040", "tp @s ^ ^1.5 ^", "tp @s ~-2 +3 .5"), r.ran);
     }
 }
