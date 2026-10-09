@@ -77,8 +77,9 @@ and 32767 characters per expanded command. `$` reads only string values; other d
 - Values inserted into a command that can run other commands — `sh …`, anything with `run` (`execute … run …`,
   `return run …`), `function …` (macro arguments), or a command whose name is itself a `$` reference — are escaped, so
   an inner chain or macro sees them as plain text, never as `&&`, `;`, `$( … )`; a value containing a quote is refused
-  there. To have an inner chain expand a name itself, write `\$name`. (Plain text containing the word `run` also gets
-  this escaping.)
+  there. A value may never supply `sh`, `run` or `function` itself (`execute as @a $r …` with `r=run` is refused). To
+  have an inner chain expand a name itself, write `\$name`. (Plain text containing the word `run` also gets this
+  escaping.)
 
 ### Without `/sh`
 

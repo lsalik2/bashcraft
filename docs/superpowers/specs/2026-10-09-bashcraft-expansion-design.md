@@ -124,7 +124,8 @@ candidates.
 
 Values inserted by expansion or pipes into a command that can run other commands are backslash-escaped
 (`\ & | ; ( ) $`), and a value containing `"` or `'` is refused there (`a value with quotes can't go into a command
-that runs other commands`). Such a command is one whose raw text contains the word `sh`, `function` or `run`, or whose
-name is itself a `$` reference. Outside double quotes, the expander treats `\'` and `\"` like the tokenizer does (the
+that runs other commands`). Such a command is one whose *expanded* text contains the word `sh`, `function` or `run`, or whose
+name is itself a `$` reference. If one of those words comes from an inserted value (`execute as @a $r sh …` with
+`r=run`, or `$c …` with `c=sh`), the command is refused: `a value can't decide which commands run`. Outside double quotes, the expander treats `\'` and `\"` like the tokenizer does (the
 quote opens).
 

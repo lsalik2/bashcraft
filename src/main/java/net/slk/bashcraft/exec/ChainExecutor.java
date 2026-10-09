@@ -15,10 +15,10 @@ import java.util.Optional;
 /** Runs a chain's syntax tree with bash semantics (spec §5): && / || / ; by status, | feeds extracted values forward, groups nest. */
 public final class ChainExecutor {
     /**
-     * Commands that may run other commands from their text: a nested sh, execute/return … run, function (whose macro
-     * lines re-read their arguments). A command whose name is itself a $ reference counts too.
+     * Words that make a command run other commands from its text: a nested sh, execute/return … run, function (whose
+     * macro lines re-read their arguments). Matched on the expanded text, as Minecraft will run it.
      */
-    private static final java.util.regex.Pattern RUNS_COMMANDS = java.util.regex.Pattern.compile("(?:^|\\s)(?:sh|function|run)(?:\\s|$)");
+    private static final java.util.regex.Pattern RUNS_COMMANDS = java.util.regex.Pattern.compile("(?<!\\S)(?:sh|function|run)(?!\\S)");
 
     private final CommandRunner runner;
     private final Variables variables;
@@ -139,11 +139,9 @@ public final class ChainExecutor {
             String text = call.argument();
             if (call.kind() != Builtins.Kind.UNSET) {
                 try {
-                    // Values put into a command that runs other commands are escaped (and may not carry quotes), or the
-                    // inner chain or function macro would read them as syntax.
-                    boolean nestedSh = call.kind() == Builtins.Kind.NONE && (text.startsWith("$") || RUNS_COMMANDS.matcher(text).find());
-                    text = Expander.expand(text, variables, lastStatus, this::substitute,
-                            input == null ? null : new Expander.PipeInput(input.value(), input.result()), nestedSh);
+                    Expander.Expansion expansion = Expander.expandParts(text, variables, lastStatus, this::substitute,
+                            input == null ? null : new Expander.PipeInput(input.value(), input.result()));
+                    text = finalText(call, command.text(), expansion);
                 } catch (ExpansionException e) {
                     runner.reportError(label(command) + e.getMessage());
                     return finish(ExecResult.failure(), command);
@@ -162,6 +160,27 @@ public final class ChainExecutor {
                 case UNSET -> unset(command, call.name());
             };
             return finish(result, command);
+        }
+
+        /**
+         * Values put into a command that can run other commands are escaped (and may not carry quotes), or an inner
+         * chain or function macro would read them as syntax; and a value may never itself supply the word that makes a
+         * command run commands. Decided on the expanded text, which is what Minecraft runs.
+         */
+        private String finalText(Builtins.Call call, String raw, Expander.Expansion expansion) throws ExpansionException {
+            String plain = expansion.join(false);
+            if (call.kind() != Builtins.Kind.NONE) {
+                return plain;
+            }
+            boolean runsCommands = raw.startsWith("$");
+            java.util.regex.Matcher keyword = RUNS_COMMANDS.matcher(plain);
+            while (keyword.find()) {
+                runsCommands = true;
+                if (expansion.insertedOverlaps(keyword.start(), keyword.end())) {
+                    throw new ExpansionException("a value can't decide which commands run");
+                }
+            }
+            return runsCommands ? expansion.join(true) : plain;
         }
 
         private Outcome finish(ExecResult result, Node.Command command) {

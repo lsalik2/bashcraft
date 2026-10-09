@@ -130,58 +130,109 @@ public final class Expander {
 
     /**
      * One pass over the command's own text, so nothing inserted is ever read again. With {@code input}, pipe
-     * placeholders are filled in, or the value is appended when there are none. With {@code escapeValues} (the command
-     * runs a nested {@code sh}), inserted values get {@code \\ & | ; ( ) $} backslash-escaped, so the inner chain reads
-     * them as text instead of chain syntax.
+     * placeholders are filled in, or the value is appended when there are none. With {@code escapeValues}, inserted
+     * values are escaped for a nested chain (see {@link Expansion#join}).
      */
     public static String expand(String text, Variables variables, int lastStatus, Substituter substituter, PipeInput input,
                                 boolean escapeValues) throws ExpansionException {
+        return expandParts(text, variables, lastStatus, substituter, input).join(escapeValues);
+    }
+
+    /** One piece of an expanded command: the author's own text, or a value inserted by expansion or a pipe. */
+    public record Part(String text, boolean inserted) {}
+
+    /** An expanded command that remembers which parts were inserted, so callers can decide how to treat them. */
+    public static final class Expansion {
+        private final List<Part> parts;
+
+        private Expansion(List<Part> parts) {
+            this.parts = List.copyOf(parts);
+        }
+
+        /**
+         * The command text. With {@code escapeValues} (the command can run other commands), inserted values get
+         * {@code \\ & | ; ( ) $} backslash-escaped so an inner chain reads them as text, and a value with a quote is
+         * refused, since a quote can't be escaped for the inner parser.
+         */
+        public String join(boolean escapeValues) throws ExpansionException {
+            StringBuilder out = new StringBuilder();
+            for (Part part : parts) {
+                out.append(escapeValues && part.inserted() ? escape(part.text()) : part.text());
+                checkLength(out);
+            }
+            return out.toString();
+        }
+
+        /** Whether {@code [start, end)} of the unescaped text overlaps an inserted value. */
+        public boolean insertedOverlaps(int start, int end) {
+            int position = 0;
+            for (Part part : parts) {
+                int partEnd = position + part.text().length();
+                if (part.inserted() && position < end && start < partEnd) {
+                    return true;
+                }
+                position = partEnd;
+            }
+            return false;
+        }
+    }
+
+    public static Expansion expandParts(String text, Variables variables, int lastStatus, Substituter substituter,
+                                        PipeInput input) throws ExpansionException {
         List<Reference> references = scan(text, input != null);
         if (references.size() > MAX_REFERENCES) {
             throw new ExpansionException("too many $ references (max " + MAX_REFERENCES + ")");
         }
-        StringBuilder out = new StringBuilder();
+        List<Part> parts = new ArrayList<>();
+        int length = 0;
         boolean placed = false;
         int last = 0;
         for (Reference reference : references) {
-            out.append(text, last, reference.start());
-            boolean inserted = true;
-            String value;
-            switch (reference.kind()) {
-                case ESCAPED_DOLLAR -> {
-                    value = "$";
-                    inserted = false;
-                }
-                case ESCAPED_PLACEHOLDER -> {
-                    value = reference.body();
-                    inserted = false;
-                }
-                case STATUS -> value = Integer.toString(lastStatus);
+            parts.add(new Part(text.substring(last, reference.start()), false));
+            Part part = switch (reference.kind()) {
+                case ESCAPED_DOLLAR -> new Part("$", false);
+                case ESCAPED_PLACEHOLDER -> new Part(reference.body(), false);
+                case STATUS -> new Part(Integer.toString(lastStatus), true);
                 case VARIABLE -> {
                     Variables.Ref ref = Variables.ref(reference.body(), Variables.Scope.ANY);
-                    value = variables.get(ref.scope(), ref.name())
-                            .orElseThrow(() -> new ExpansionException("$" + reference.body() + " is not set"));
+                    yield new Part(variables.get(ref.scope(), ref.name())
+                            .orElseThrow(() -> new ExpansionException("$" + reference.body() + " is not set")), true);
                 }
-                case SUBSTITUTION -> value = substituter.run(reference.body());
+                case SUBSTITUTION -> new Part(substituter.run(reference.body()), true);
                 case PLACEHOLDER -> {
                     placed = true;
-                    value = placeholder(reference.body(), input);
+                    yield new Part(placeholder(reference.body(), input), true);
                 }
                 default -> throw new ExpansionException(reference.body());
+            };
+            parts.add(part);
+            length += reference.start() - last + part.text().length();
+            if (length > MAX_LENGTH) {
+                throw new ExpansionException("expansion longer than " + MAX_LENGTH + " characters");
             }
-            out.append(escapeValues && inserted ? escape(value) : value);
-            checkLength(out);
             last = reference.end();
         }
-        out.append(text, last, text.length());
+        parts.add(new Part(text.substring(last), false));
         if (input != null && !placed) {
-            String argument = input.value().asArgument();
-            String appended = out.toString().stripTrailing() + " " + (escapeValues ? escape(argument) : argument);
-            out.setLength(0);
-            out.append(appended);
+            stripTrailing(parts);
+            parts.add(new Part(" ", false));
+            parts.add(new Part(input.value().asArgument(), true));
         }
-        checkLength(out);
-        return out.toString();
+        Expansion expansion = new Expansion(parts);
+        expansion.join(false);
+        return expansion;
+    }
+
+    /** Removes trailing whitespace across the last parts (the appended pipe value follows a single space). */
+    private static void stripTrailing(List<Part> parts) {
+        while (!parts.isEmpty()) {
+            Part last = parts.removeLast();
+            String stripped = last.text().stripTrailing();
+            if (!stripped.isEmpty()) {
+                parts.add(new Part(stripped, last.inserted()));
+                return;
+            }
+        }
     }
 
     private static String placeholder(String name, PipeInput input) throws ExpansionException {

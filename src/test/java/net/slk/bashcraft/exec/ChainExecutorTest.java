@@ -354,10 +354,26 @@ class ChainExecutorTest {
     }
 
     @Test
-    void aCommandNameFromAVariableCountsAsNested() throws Exception {
+    void aValueCantBecomeTheCommandThatRunsCommands() throws Exception {
         FakeRunner r = new FakeRunner();
         run(r, table(), "c=sh ; x='1 && /kill @e' ; $c say $x");
-        assertEquals(List.of("sh say 1 \\&\\& /kill @e"), r.ran);
+        assertEquals(List.of("[3] a value can't decide which commands run"), r.errors);
+        assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void aValueCantSupplyRun() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "r=run ; x='1 && /kill @e' ; execute as @a $r sh say $x ; execute as @a $(echo run) say hi");
+        assertEquals(List.of("[3] a value can't decide which commands run", "[4] a value can't decide which commands run"), r.errors);
+        assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void aCommandNamedByAVariableStillGetsEscapedValues() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "c=say ; x='a && b' ; $c $x");
+        assertEquals(List.of("say a \\&\\& b"), r.ran);
     }
 
     @Test
