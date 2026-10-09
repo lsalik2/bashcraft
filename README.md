@@ -66,6 +66,13 @@ Set `transparentMode` to `false` to turn this off (function files pick up the ch
 Macro lines (`$…`) in functions are never chained: a macro value could otherwise add commands to the line. Writing
 `$sh …` yourself is possible, but then any `;`, `|` or `&&` inside a substituted value counts as an operator.
 
+## Client companion (optional)
+
+Install the same jar on your client too, and on servers that run BashCraft the chat box understands chains:
+each command is highlighted the way vanilla highlights it (no red after `&&`), operators and parentheses are
+coloured, BashCraft syntax errors show above the chat box, and tab-completion works for the command you're typing —
+also inside `/sh …` lines and in command blocks. On servers without BashCraft the client behaves exactly as vanilla.
+
 ## Config
 
 `config/bashcraft.json`: `maxSegments` (32), `maxDepth` (8), `maxTotalCommands` (256, across nested chains),
@@ -77,5 +84,5 @@ Macro lines (`$…`) in functions are never chained: a macro value could otherwi
 ```
 JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew build          # jar in build/libs
 JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew test           # unit tests
-JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew runClientGameTest   # in-game tests (~2 min)
+JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew runClientGameTest   # in-game tests, headless on Xvfb if installed (-Pheadless=false for a window)
 ```

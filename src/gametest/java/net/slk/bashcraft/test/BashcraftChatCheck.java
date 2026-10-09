@@ -29,6 +29,9 @@ public class BashcraftChatCheck implements FabricClientGameTest {
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "placeholders don't turn a pipe stage red");
             context.takeScreenshot("bashcraft-chain-highlight");
 
+            context.runOnClient(client -> ChatProbe.open(client, "/sh say a && function bashcraft-test:"));
+            context.waitFor(client -> ChatProbe.completions(client).contains("bashcraft-test:chain"), 100);
+
             context.runOnClient(client -> ChatProbe.open(client, "/(/say a || /say b"));
             context.waitFor(client -> !ChatProbe.usage(client).isEmpty(), 100);
             check(context.computeOnClient(client -> ChatProbe.usage(client).getFirst().startsWith("BashCraft: unclosed '('")),

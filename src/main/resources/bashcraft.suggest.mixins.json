@@ -1,0 +1,11 @@
+{
+	"required": false,
+	"package": "net.slk.bashcraft.mixin.suggest",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"ServerCommandSuggestionsProviderMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}
