@@ -6,7 +6,6 @@ import net.slk.bashcraft.chain.NodeParser;
 import net.slk.bashcraft.pipe.PipeException;
 import net.slk.bashcraft.pipe.PipeResolver;
 import net.slk.bashcraft.pipe.PipeValue;
-import net.slk.bashcraft.pipe.Placeholders;
 
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -15,6 +14,8 @@ import java.util.Optional;
 
 /** Runs a chain's syntax tree with bash semantics (spec §5): && / || / ; by status, | feeds extracted values forward, groups nest. */
 public final class ChainExecutor {
+    private static final java.util.regex.Pattern NESTED_SH = java.util.regex.Pattern.compile("^sh\\s|\\srun\\s+sh\\s");
+
     private final CommandRunner runner;
     private final Variables variables;
     private final boolean swallowPipedOutput;
@@ -134,11 +135,11 @@ public final class ChainExecutor {
             String text = call.argument();
             if (call.kind() != Builtins.Kind.UNSET) {
                 try {
-                    text = Expander.expand(text, variables, lastStatus, this::substitute);
-                    if (input != null) {
-                        text = Placeholders.inject(text, input.value(), input.result());
-                    }
-                } catch (ExpansionException | PipeException e) {
+                    // Values put into a nested sh are escaped, or the inner chain would read them as chain syntax.
+                    boolean nestedSh = call.kind() == Builtins.Kind.NONE && NESTED_SH.matcher(text).find();
+                    text = Expander.expand(text, variables, lastStatus, this::substitute,
+                            input == null ? null : new Expander.PipeInput(input.value(), input.result()), nestedSh);
+                } catch (ExpansionException e) {
                     runner.reportError(label(command) + e.getMessage());
                     return finish(ExecResult.failure(), command);
                 }

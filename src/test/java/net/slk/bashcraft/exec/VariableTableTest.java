@@ -82,4 +82,11 @@ class VariableTableTest {
         VariableTable table = new VariableTable(global, global, false, false);
         assertThrows(ExpansionException.class, () -> table.set(Variables.Scope.ANY, "x", "1"));
     }
+
+    @Test
+    void longNamesAreRejected() {
+        VariableTable table = new VariableTable(new HashMap<>(), new HashMap<>());
+        assertEquals("variable name longer than 64 characters",
+                assertThrows(ExpansionException.class, () -> table.set(Variables.Scope.OWN, "n".repeat(65), "1")).getMessage());
+    }
 }

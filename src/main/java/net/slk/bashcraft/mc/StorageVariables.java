@@ -12,7 +12,6 @@ import net.slk.bashcraft.exec.VariableTable;
 import net.slk.bashcraft.exec.Variables;
 import net.slk.bashcraft.mixin.CommandSourceStackAccessor;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -57,53 +56,57 @@ public final class StorageVariables implements Variables {
 
     @Override
     public Optional<String> get(Scope scope, String name) {
-        return load().table().get(scope, name);
+        return table(storage.get(ID), false).get(scope, name);
     }
 
     @Override
     public void set(Scope scope, String name, String value) throws ExpansionException {
-        Loaded loaded = load();
-        loaded.table().set(scope, name, value);
-        save(loaded);
+        CompoundTag root = storage.get(ID);
+        table(root, true).set(scope, name, value);
+        save(root);
     }
 
     @Override
     public void unset(Scope scope, String name) throws ExpansionException {
-        Loaded loaded = load();
-        loaded.table().unset(scope, name);
-        save(loaded);
+        CompoundTag root = storage.get(ID);
+        table(root, true).unset(scope, name);
+        save(root);
     }
 
-    private record Loaded(CompoundTag root, Map<String, String> own, Map<String, String> global, VariableTable table) {}
-
-    private Loaded load() {
-        CompoundTag root = storage.get(ID).copy();
-        Map<String, String> global = strings(root.getCompoundOrEmpty("global"));
-        Map<String, String> own = player == null ? global : strings(root.getCompoundOrEmpty("players").getCompoundOrEmpty(player));
-        return new Loaded(root, own, global, new VariableTable(own, global, preferMine, globalWritable));
+    /**
+     * The table over the live storage tag. For reads nothing is copied or created; for writes the sets that may change
+     * are attached to the tree first, so the per-key edits land in it.
+     */
+    private VariableTable table(CompoundTag root, boolean forWrite) {
+        CompoundTag global = forWrite ? child(root, "global") : root.getCompoundOrEmpty("global");
+        Map<String, String> globalSet = new TagStrings(global);
+        if (player == null) {
+            return new VariableTable(globalSet, globalSet, preferMine, globalWritable);
+        }
+        CompoundTag mine = forWrite ? child(child(root, "players"), player) : root.getCompoundOrEmpty("players").getCompoundOrEmpty(player);
+        return new VariableTable(new TagStrings(mine), globalSet, preferMine, globalWritable);
     }
 
-    private void save(Loaded loaded) {
-        loaded.root().put("global", tag(loaded.global()));
+    /** Drops this player's set once it is empty, so storage doesn't keep a compound per player forever. */
+    private void save(CompoundTag root) {
         if (player != null) {
-            CompoundTag players = loaded.root().getCompoundOrEmpty("players");
-            players.put(player, tag(loaded.own()));
-            loaded.root().put("players", players);
+            root.getCompound("players").ifPresent(players -> {
+                if (players.getCompoundOrEmpty(player).isEmpty()) {
+                    players.remove(player);
+                }
+                if (players.isEmpty()) {
+                    root.remove("players");
+                }
+            });
         }
-        storage.set(ID, loaded.root());
+        storage.set(ID, root);
     }
 
-    private static Map<String, String> strings(CompoundTag tag) {
-        Map<String, String> map = new LinkedHashMap<>();
-        for (String key : tag.keySet()) {
-            tag.getString(key).ifPresent(value -> map.put(key, value));
-        }
-        return map;
-    }
-
-    private static CompoundTag tag(Map<String, String> map) {
-        CompoundTag tag = new CompoundTag();
-        map.forEach(tag::putString);
-        return tag;
+    private static CompoundTag child(CompoundTag parent, String key) {
+        return parent.getCompound(key).orElseGet(() -> {
+            CompoundTag created = new CompoundTag();
+            parent.put(key, created);
+            return created;
+        });
     }
 }

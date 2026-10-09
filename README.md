@@ -65,6 +65,18 @@ succeeded, else `1`. `$( … )` runs a chain and inserts its value like a pipe w
 `\$` is a literal `$`. An unset variable makes that command fail instead of running with a blank. Inside chains,
 `echo` and `unset` are BashCraft's even if a mod has commands with those names.
 
+Limits: 256 variables per set, names up to 64 characters, values up to 1024 characters, at most 256 `$` references
+and 32767 characters per expanded command. `$` reads only string values; other data a datapack keeps in
+`bashcraft:vars global` is left untouched. In function macro lines (`$…`), vanilla owns `$(name)`, so BashCraft's
+`$( … )` can't be used there.
+
+**Security notes:**
+- Anyone can read the global set with `echo $global.x`; don't keep secrets there.
+- A player controls their own set: in functions, command blocks and `execute as … run sh`, treat `$my.x` as untrusted
+  text — it can still change a single command's arguments (`give @s $my.item`).
+- Values inserted into a command that runs a nested `sh` (`sh …`, `execute … run sh …`) are escaped, so the inner chain
+  sees them as plain text, never as `&&`, `;`, `$( … )`. To have the inner chain expand a name itself, write `\$name`.
+
 ### Without `/sh`
 
 Chains also work typed directly, as long as every command after an operator starts with `/`:

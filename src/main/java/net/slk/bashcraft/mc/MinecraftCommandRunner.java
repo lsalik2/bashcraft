@@ -3,6 +3,7 @@ package net.slk.bashcraft.mc;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.context.ContextChain;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.execution.ExecutionContext;
@@ -75,7 +76,12 @@ public final class MinecraftCommandRunner implements CommandRunner {
      */
     private boolean typedByPlayer(TeeSource tee) {
         ServerPlayer player = invoker.getPlayer();
-        return player != null && player.commandSource() == tee.target() && !invoker.isSilent();
+        CommandSource origin = tee.target();
+        while (origin instanceof TeeSource outer) {
+            // A nested sh's segments run with the outer segment's tee as their source.
+            origin = outer.target();
+        }
+        return player != null && player.commandSource() == origin && !invoker.isSilent();
     }
 
     private static String prefix(RunOptions options) {

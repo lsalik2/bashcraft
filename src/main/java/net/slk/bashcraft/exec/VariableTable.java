@@ -10,6 +10,7 @@ import java.util.Optional;
 public final class VariableTable implements Variables {
     public static final int MAX_VARIABLES = 256;
     public static final int MAX_LENGTH = 1024;
+    public static final int MAX_NAME = 64;
 
     private final Map<String, String> mine;
     private final Map<String, String> global;
@@ -47,6 +48,9 @@ public final class VariableTable implements Variables {
     @Override
     public void set(Scope scope, String name, String value) throws ExpansionException {
         Map<String, String> target = writable(scope);
+        if (name.length() > MAX_NAME) {
+            throw new ExpansionException("variable name longer than " + MAX_NAME + " characters");
+        }
         if (value.length() > MAX_LENGTH) {
             throw new ExpansionException("value longer than " + MAX_LENGTH + " characters");
         }

@@ -83,6 +83,11 @@ public class BashcraftChainCheck implements FabricClientGameTest {
             context.waitTicks(5);
             server.runCommand("execute if score @p trig matches 9 run setblock 7 120 5 minecraft:stone");
             check(!stone(server, 7, 5), "a player's /sh refuses chat commands that would need signing");
+            server.runCommand("scoreboard players enable @a trig");
+            context.runOnClient(client -> client.getConnection().sendCommand("sh sh msg Player0 hi && trigger trig set 11"));
+            context.waitTicks(5);
+            server.runCommand("execute if score @p trig matches 11 run setblock 9 120 5 minecraft:stone");
+            check(!stone(server, 9, 5), "a nested sh typed by the player also refuses chat commands");
 
             server.runCommand("function bashcraft-test:recurse");
             server.runCommand("sh scoreboard players get depth bc | setblock {value} 120 2 minecraft:stone");

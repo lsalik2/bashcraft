@@ -75,4 +75,17 @@ class ExpanderTest {
         assertEquals("tp @s 00 0000 000000 \\$z 00", Expander.mask("tp @s $x ${y} $(a b) \\$z $?"));
         assertEquals("say '$x'", Expander.mask("say '$x'"));
     }
+
+    @Test
+    void tooManyReferencesIsAnError() {
+        String text = "say " + "$x".repeat(Expander.MAX_REFERENCES + 1);
+        assertEquals("too many $ references (max 256)", assertThrows(ExpansionException.class, () -> expand(text, vars("x", "1"))).getMessage());
+    }
+
+    @Test
+    void expandedTextIsCapped() {
+        String text = "say " + "$x".repeat(40);
+        assertEquals("expansion longer than 32767 characters",
+                assertThrows(ExpansionException.class, () -> expand(text, vars("x", "a".repeat(1000)))).getMessage());
+    }
 }

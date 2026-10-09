@@ -324,4 +324,32 @@ class ChainExecutorTest {
         run(r, "x=1");
         assertEquals(List.of("variables are not available here"), r.errors);
     }
+
+    @Test
+    void variableTextIsNotAPlaceholder() throws Exception {
+        FakeRunner r = new FakeRunner().on("get", new ExecResult(true, 5, List.of(Feedback.plain("5"))));
+        run(r, table(), "q={value} ; get | say $q");
+        assertEquals(List.of("get", "say {value} 5"), r.ran);
+    }
+
+    @Test
+    void pipedTextIsNeverExpanded() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "echo \\$(danger) | say");
+        assertEquals(List.of("say $(danger)"), r.ran);
+    }
+
+    @Test
+    void valuesInsertedIntoANestedShAreEscaped() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "x='1 && /kill @e $(y)' ; sh say $x");
+        assertEquals(List.of("sh say 1 \\&\\& /kill @e \\$\\(y\\)"), r.ran);
+    }
+
+    @Test
+    void pipeValuesIntoANestedShAreEscaped() throws Exception {
+        FakeRunner r = new FakeRunner().on("a", new ExecResult(true, 1, List.of(Feedback.plain("x;y"))));
+        run(r, table(), "a | execute as @a run sh say");
+        assertEquals("execute as @a run sh say x\\;y", r.ran.get(1));
+    }
 }

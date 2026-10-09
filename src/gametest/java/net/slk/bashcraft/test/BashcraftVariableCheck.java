@@ -41,6 +41,11 @@ public class BashcraftVariableCheck implements FabricClientGameTest {
             server.runCommand("execute as @p run sh setblock $x 120 13 minecraft:stone");
             check(stone(server, 1, 13) && !stone(server, 9, 13), "a player's own x doesn't shadow the global x in an elevated chain");
 
+            server.runCommand("data modify storage bashcraft:vars global.round set value 3");
+            server.runCommand("sh y=1");
+            server.runCommand("execute if data storage bashcraft:vars global{round:3} run setblock 11 120 13 minecraft:stone");
+            check(stone(server, 11, 13), "a variable write keeps non-string data datapacks stored in global");
+
             server.runCommand("scoreboard players set n bc 5");
             server.runCommand("sh setblock $(scoreboard players get n bc) 120 10 minecraft:stone");
             check(stone(server, 5, 10), "$( … ) inserts a command's value");
