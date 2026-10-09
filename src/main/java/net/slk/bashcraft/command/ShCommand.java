@@ -17,7 +17,11 @@ import net.slk.bashcraft.config.BashcraftConfig;
 import net.slk.bashcraft.exec.ChainExecutor;
 import net.slk.bashcraft.exec.DepthGuard;
 import net.slk.bashcraft.exec.ExecResult;
+import net.slk.bashcraft.exec.ShellContext;
+import net.slk.bashcraft.mc.HistoryBook;
 import net.slk.bashcraft.mc.MinecraftCommandRunner;
+import net.slk.bashcraft.mc.Sources;
+import net.slk.bashcraft.mc.StorageAliases;
 import net.slk.bashcraft.mc.StorageVariables;
 
 import java.util.Optional;
@@ -47,12 +51,31 @@ public final class ShCommand {
 
     /** Parses and runs a chain as {@code source}; returns the last segment's outcome (a failure for parse or limit errors). */
     public static ExecResult run(CommandSourceStack source, String input) {
+        boolean typed = Sources.typedDirectly(source);
+        String line = input.strip();
+        if (line.startsWith("!")) {
+            if (!typed) {
+                source.sendFailure(Component.literal("BashCraft: history is only for chains you type"));
+                return ExecResult.failure();
+            }
+            Optional<String> resolved = HistoryBook.of(Sources.typist(source).orElseThrow()).resolve(line);
+            if (resolved.isEmpty()) {
+                source.sendFailure(Component.literal("BashCraft: no history matching " + line.substring(1)));
+                return ExecResult.failure();
+            }
+            line = resolved.get();
+            String shown = line;
+            source.sendSuccess(() -> Component.literal("sh " + shown).withStyle(ChatFormatting.GRAY), false);
+        }
+        if (typed) {
+            HistoryBook.of(Sources.typist(source).orElseThrow()).record(line);
+        }
         Node chain;
         try {
-            chain = NodeParser.parse(input, NodeParser.Mode.SH, BashcraftConfig.get().maxSegments);
+            chain = NodeParser.parse(line, NodeParser.Mode.SH, BashcraftConfig.get().maxSegments);
         } catch (ChainSyntaxException e) {
             source.sendFailure(Component.literal("BashCraft: " + e.getMessage()));
-            source.sendFailure(Component.literal(e.context(input)).withStyle(ChatFormatting.GRAY));
+            source.sendFailure(Component.literal(e.context(line)).withStyle(ChatFormatting.GRAY));
             return ExecResult.failure();
         }
         return execute(source, chain);
@@ -67,7 +90,9 @@ public final class ShCommand {
             return ExecResult.failure();
         }
         try (DepthGuard.Scope ignored = scope.get()) {
-            return new ChainExecutor(new MinecraftCommandRunner(source), StorageVariables.of(source),
+            ShellContext shell = new ShellContext(StorageVariables.of(source), StorageAliases.of(source),
+                    Sources.typist(source).map(HistoryBook::of).orElse(null));
+            return new ChainExecutor(new MinecraftCommandRunner(source), shell,
                     config.swallowPipedOutput, config.maxTotalCommands, config.maxDepth).execute(chain);
         }
     }

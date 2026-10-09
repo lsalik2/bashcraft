@@ -7,6 +7,8 @@ import net.slk.bashcraft.chain.TransparentChains;
 import net.slk.bashcraft.command.ShCommand;
 import net.slk.bashcraft.config.BashcraftConfig;
 import net.slk.bashcraft.exec.ExecResult;
+import net.slk.bashcraft.mc.HistoryBook;
+import net.slk.bashcraft.mc.Sources;
 import net.slk.bashcraft.mc.TeeSource;
 import net.slk.bashcraft.mixin.CommandSourceStackAccessor;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,6 +29,7 @@ public abstract class CommandsTransparentMixin {
         }
         TransparentChains.detect(command, config.maxSegments).ifPresent(chain -> {
             ci.cancel();
+            Sources.typist(source).ifPresent(player -> HistoryBook.of(player).record(command));
             ExecResult result = ShCommand.execute(source, chain);
             source.callback().onResult(result.success(), result.success() ? result.result() : 0);
         });
