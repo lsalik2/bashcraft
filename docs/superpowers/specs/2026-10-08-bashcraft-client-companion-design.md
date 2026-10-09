@@ -90,8 +90,7 @@ Two hooks on the vanilla suggestion helper used by chat and the command-block sc
 a chain or `sh` line in the request (same rules as §4, using the server's real `transparentMode`) and parses only
 the **last** command with the truncated-reader trick (its end is the request's end, since the client sends input up
 to the cursor), so returned ranges are absolute and the client applies them unchanged. Non-chain requests are
-untouched. This hook goes in the existing optional transparent mixin config's sibling, `bashcraft.suggest.mixins.json`
-(non-required).
+untouched. This hook lives in its own non-required mixin config, `bashcraft.suggest.mixins.json`.
 
 ## 7. Out of scope
 
@@ -108,5 +107,6 @@ for BashCraft syntax itself (e.g. suggesting `&&`).
 - **Client game tests:** in a world where the hello arrives — open a `ChatScreen` with `/tp @s ~ ~ ~ && /summon `,
   check the formatted text has no red style and the suggestion list offers `minecraft:zombie`; `/sh say a && function
   bashcraft-test:` offers a test function (server round trip); `/(/say a || /say b` shows the BashCraft hint; a
-  screenshot of a coloured chain is saved for visual review. With the hello suppressed (test hook on the server
-  side of the test world), the same input is formatted exactly as vanilla formats it.
+  screenshot of a coloured chain is saved for visual review. After clearing the client's session state (the same
+  reset that runs on disconnect, standing in for a server without BashCraft), the same input is formatted exactly as
+  vanilla formats it.
