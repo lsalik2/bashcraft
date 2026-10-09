@@ -59,7 +59,9 @@ public final class Expander {
                     i = escaped.end();
                     continue;
                 }
-                i += 2;
+                // Inside double quotes a backslash escapes the next character (as Quotes.closingQuote reads it); outside,
+                // the tokenizer already resolved its escapes, and a quote after a backslash opens like any other.
+                i += inDouble ? 2 : 1;
                 continue;
             }
             if (placeholders && c == '{') {
@@ -190,7 +192,11 @@ public final class Expander {
                 .orElseThrow(() -> new ExpansionException("{" + name + "} is not available from " + input.value().describe()));
     }
 
-    private static String escape(String value) {
+    private static String escape(String value) throws ExpansionException {
+        if (value.indexOf('"') >= 0 || value.indexOf('\'') >= 0) {
+            // A quote can't be escaped for the inner parser: it would decide what the inner chain splits on.
+            throw new ExpansionException("a value with quotes can't go into a command that runs other commands");
+        }
         StringBuilder out = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);

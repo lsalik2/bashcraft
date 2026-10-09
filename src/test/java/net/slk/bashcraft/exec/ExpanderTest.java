@@ -88,4 +88,9 @@ class ExpanderTest {
         assertEquals("expansion longer than 32767 characters",
                 assertThrows(ExpansionException.class, () -> expand(text, vars("x", "a".repeat(1000)))).getMessage());
     }
+
+    @Test
+    void backslashBeforeAQuoteOpensTheQuoteLikeTheTokenizer() throws Exception {
+        assertEquals("say \\'$x'", expand("say \\'$x'", vars("x", "1")));
+    }
 }

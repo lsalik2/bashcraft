@@ -352,4 +352,33 @@ class ChainExecutorTest {
         run(r, table(), "a | execute as @a run sh say");
         assertEquals("execute as @a run sh say x\\;y", r.ran.get(1));
     }
+
+    @Test
+    void aCommandNameFromAVariableCountsAsNested() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "c=sh ; x='1 && /kill @e' ; $c say $x");
+        assertEquals(List.of("sh say 1 \\&\\& /kill @e"), r.ran);
+    }
+
+    @Test
+    void valuesInFunctionMacroArgumentsAreEscaped() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "x='1 && b' ; function ns:f {v:$x}");
+        assertEquals(List.of("function ns:f {v:1 \\&\\& b}"), r.ran);
+    }
+
+    @Test
+    void quotedValuesCantGoIntoCommandsThatRunCommands() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "x='a\" && /kill \"b' ; execute as @a run sh say $x");
+        assertEquals(List.of("[2] a value with quotes can't go into a command that runs other commands"), r.errors);
+        assertTrue(r.ran.isEmpty());
+    }
+
+    @Test
+    void plainCommandsStillGetValuesAsIs() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, table(), "x='say \"hi\" && b' ; tellraw @a $x");
+        assertEquals(List.of("tellraw @a say \"hi\" && b"), r.ran);
+    }
 }

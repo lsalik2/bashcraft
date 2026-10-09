@@ -119,3 +119,12 @@ to them (the tokenizer keeps it whole).
 
 Arithmetic `$((…))`, arrays, listing variables (`vars`), a `command` builtin to reach shadowed mod commands — later
 candidates.
+
+## 9. Hardening (after security review, 2026-10-09)
+
+Values inserted by expansion or pipes into a command that can run other commands are backslash-escaped
+(`\ & | ; ( ) $`), and a value containing `"` or `'` is refused there (`a value with quotes can't go into a command
+that runs other commands`). Such a command is one whose raw text contains the word `sh`, `function` or `run`, or whose
+name is itself a `$` reference. Outside double quotes, the expander treats `\'` and `\"` like the tokenizer does (the
+quote opens).
+
