@@ -513,4 +513,53 @@ class ChainExecutorTest {
         run(r, table(), "o=best ; a | store score @s $o");
         assertEquals("scoreboard players set @s best 7", r.ran.get(1));
     }
+
+    @Test
+    void eachRunsOncePerItem() throws Exception {
+        FakeRunner r = new FakeRunner().on("list", new ExecResult(true, 2, List.of(players("Alex", "Steve"))));
+        ExecResult result = run(r, table(), "list | each say hi {value} ; list | each tp");
+        assertEquals(List.of("list", "say hi Alex", "say hi Steve", "list", "tp Alex", "tp Steve"), r.ran);
+        assertTrue(result.success());
+        assertEquals(2, result.result());
+    }
+
+    @Test
+    void eachCollectsTheRunsValues() throws Exception {
+        FakeRunner r = new FakeRunner()
+                .on("list", new ExecResult(true, 2, List.of(players("Alex", "Steve"))))
+                .on("xp Alex", new ExecResult(true, 5, List.of(Feedback.plain("5"))))
+                .on("xp Steve", new ExecResult(true, 7, List.of(Feedback.plain("7"))));
+        run(r, table(), "list | each xp {value} | store storage bc:s levels");
+        assertEquals("data modify storage bc:s levels set value [5,7]", r.ran.getLast());
+        assertEquals(List.of(true, true, false), r.options.stream().skip(1).limit(3).map(RunOptions::swallowSuccess).toList());
+    }
+
+    @Test
+    void eachFailsWhenARunFailsOrThereAreNoItems() throws Exception {
+        FakeRunner r = new FakeRunner()
+                .on("list", new ExecResult(true, 2, List.of(players("Alex", "Steve"))))
+                .on("empty", new ExecResult(true, 0, List.of(players())))
+                .on("say Alex", FAIL);
+        run(r, table(), "list | each say || say partial ; empty | each say || say none ; list | each");
+        assertEquals(List.of("list", "say Alex", "say Steve", "say partial", "empty", "say none", "list"), r.ran);
+        assertEquals(List.of("[5] each had no items", "[8] each needs a command"), r.errors);
+    }
+
+    @Test
+    void eachRunsCountTowardTheBudget() throws Exception {
+        try (DepthGuard.Scope outer = DepthGuard.enter(8).orElseThrow()) {
+            FakeRunner r = new FakeRunner().on("list", new ExecResult(true, 3, List.of(players("A", "B", "C"))));
+            new ChainExecutor(r, table(), true, 3, 8).execute(NodeParser.parse("list | each say {value}", NodeParser.Mode.SH, 32));
+            assertEquals(List.of("list", "say A", "say B"), r.ran);
+            assertEquals(List.of("[2] too many commands across nested chains (max 3)"), r.errors);
+        }
+    }
+
+    @Test
+    void eachInAnElevatedChainChecksItems() throws Exception {
+        FakeRunner r = new FakeRunner().on("names", new ExecResult(true, 2, List.of(players("Alex", "a\"b"))));
+        run(r, elevated(Map.of(), Map.of()), "names | each say {value}");
+        assertEquals(List.of("names", "say Alex"), r.ran);
+        assertEquals(List.of("[2] a value from a player can only be one plain word or a list of numbers here"), r.errors);
+    }
 }

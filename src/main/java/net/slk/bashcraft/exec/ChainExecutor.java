@@ -83,6 +83,7 @@ public final class ChainExecutor {
         private final Map<Node.Command, Integer> numbers;
         private final boolean numbered;
         private int lastStatus;
+        private boolean budgetExceeded;
 
         Run(Map<Node.Command, Integer> numbers, boolean numbered) {
             this.numbers = numbers;
@@ -136,6 +137,7 @@ public final class ChainExecutor {
         }
 
         private Outcome command(Node.Command command, Piped input, boolean feedsPipe) {
+            budgetExceeded = false;
             Builtins.Call call = Builtins.classify(command.text());
             String text = call.argument();
             if (call.kind() != Builtins.Kind.UNSET && call.kind() != Builtins.Kind.EACH) {
@@ -159,6 +161,7 @@ public final class ChainExecutor {
                 }
             }
             if (!DepthGuard.spend(maxTotalCommands)) {
+                budgetExceeded = true;
                 runner.reportError(label(command) + "too many commands across nested chains (max " + maxTotalCommands + ")");
                 return finish(ExecResult.failure(), command);
             }
@@ -266,10 +269,44 @@ public final class ChainExecutor {
             return java.util.OptionalLong.empty();
         }
 
-        /** Implemented in Task 3. */
+        /**
+         * each COMMAND: run COMMAND once per item with that item as its pipe value, through the normal command path
+         * (so expansion, the plain-value rule and escaping apply to every run). Output: the values the runs produced.
+         */
         private ExecResult each(Node.Command command, String body, Piped input, boolean feedsPipe) {
-            runner.reportError(label(command) + "each needs a command");
-            return ExecResult.failure();
+            if (body.isBlank()) {
+                runner.reportError(label(command) + "each needs a command");
+                return ExecResult.failure();
+            }
+            if (input.items().isEmpty()) {
+                runner.reportError(label(command) + "each had no items");
+                return ExecResult.failure();
+            }
+            Node.Command run = new Node.Command(body.strip());
+            numbers.put(run, numbers.get(command));
+            boolean allSucceeded = true;
+            int succeeded = 0;
+            List<String> collected = new java.util.ArrayList<>();
+            for (String item : input.items()) {
+                ExecResult result = command(run, new Piped(PipeValue.of(item), input.result(), List.of(item)), feedsPipe).result();
+                if (result.success()) {
+                    succeeded++;
+                } else {
+                    allSucceeded = false;
+                }
+                if (!result.errored()) {
+                    try {
+                        collected.add(piped(result).value().asArgument());
+                    } catch (PipeException e) {
+                        // A run without a value adds nothing.
+                    }
+                }
+                if (budgetExceeded) {
+                    // Every further run would be refused the same way.
+                    break;
+                }
+            }
+            return new ExecResult(allSucceeded && succeeded > 0, false, succeeded, List.of(), new PipeValue.Items(collected));
         }
 
         private Outcome finish(ExecResult result, Node.Command command) {
