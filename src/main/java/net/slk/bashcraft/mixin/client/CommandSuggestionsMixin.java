@@ -165,7 +165,12 @@ public abstract class CommandSuggestionsMixin {
             return false;
         }
         Builtins.Kind kind = bashcraft$kindAt(window);
-        return kind != Builtins.Kind.NONE && !(kind == Builtins.Kind.EACH && cursor >= window.start() + 5);
+        if (kind == Builtins.Kind.NONE) {
+            String value = input.getValue();
+            String word = value.substring(window.start(), Math.min(window.end(), value.length())).strip().split("\\s", 2)[0];
+            return ClientChains.isAlias(word);
+        }
+        return !(kind == Builtins.Kind.EACH && cursor >= window.start() + 5);
     }
 
     @Unique

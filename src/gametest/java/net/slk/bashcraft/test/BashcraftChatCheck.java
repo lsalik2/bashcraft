@@ -63,6 +63,11 @@ public class BashcraftChatCheck implements FabricClientGameTest {
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "pipe builtins are not shown as errors");
 
+            context.runOnClient(client -> client.getConnection().sendCommand("sh alias hb = say hi"));
+            context.waitTicks(5);
+            context.runOnClient(client -> ChatProbe.open(client, "/sh hb && hb"));
+            context.waitTicks(2);
+            check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "alias calls are not shown as errors");
             context.runOnClient(client -> ChatProbe.open(client, "/tp @s ~ ~ ~"));
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "a vanilla line is unchanged");
