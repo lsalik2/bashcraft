@@ -84,6 +84,22 @@ and 32767 characters per expanded command. `$` reads only string values; other d
   have an inner chain expand a name itself, write `\$name`. (Plain text containing the word `run` also gets this
   escaping.)
 
+**Pipe stages:** `store`, `grep` and `each` work on what the previous command produced.
+
+```
+/sh scoreboard players get @s kills | store score @s best
+/sh locate structure #minecraft:village | store storage bashcraft:places village
+/sh list | grep Steve && say Steve is online
+/sh list | each msg {value} hi
+/sh list | each data get entity {value} XpLevel | store storage bashcraft:stats levels
+```
+
+List commands give real items: `/list` (players), `/tag … list`, `/team list`, `/scoreboard players list`, and
+`/data get` on an NBT list. Other commands give one item per message. `grep [-v] [-x] TEXT` keeps items containing
+TEXT (any case; `-x` whole item, `-v` the others) and fails if none are left. `each COMMAND` runs one command per item
+(`{value}` is the item) and passes on the values they produce. `store score HOLDER OBJECTIVE` (numbers, rounded down)
+and `store storage ID PATH` run the matching vanilla command as you, so they need its permissions.
+
 ### Without `/sh`
 
 Chains also work typed directly, as long as every command after an operator starts with `/`:
