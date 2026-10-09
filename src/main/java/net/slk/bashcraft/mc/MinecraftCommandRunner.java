@@ -55,9 +55,13 @@ public final class MinecraftCommandRunner implements CommandRunner {
         return new ExecResult(success[0] && result[0] > 0, !success[0], result[0], output);
     }
 
+    /** Sends the text through the same tee as a command's success output, so it is captured, hidden or numbered alike. */
     @Override
     public ExecResult echo(String text, RunOptions options) {
-        throw new UnsupportedOperationException("echo is wired up in Task 4");
+        TeeSource tee = new TeeSource(((CommandSourceStackAccessor) invoker).bashcraft$source(), options);
+        invoker.withSource(tee).sendSuccess(() -> Component.literal(text), false);
+        List<Feedback> output = tee.captured().stream().map(ComponentFeedback::toFeedback).toList();
+        return new ExecResult(true, 1, output);
     }
 
     @Override

@@ -18,6 +18,7 @@ import net.slk.bashcraft.exec.ChainExecutor;
 import net.slk.bashcraft.exec.DepthGuard;
 import net.slk.bashcraft.exec.ExecResult;
 import net.slk.bashcraft.mc.MinecraftCommandRunner;
+import net.slk.bashcraft.mc.StorageVariables;
 
 import java.util.Optional;
 
@@ -66,7 +67,8 @@ public final class ShCommand {
             return ExecResult.failure();
         }
         try (DepthGuard.Scope ignored = scope.get()) {
-            return new ChainExecutor(new MinecraftCommandRunner(source), config.swallowPipedOutput, config.maxTotalCommands).execute(chain);
+            return new ChainExecutor(new MinecraftCommandRunner(source), StorageVariables.of(source),
+                    config.swallowPipedOutput, config.maxTotalCommands, config.maxDepth).execute(chain);
         }
     }
 }

@@ -47,6 +47,23 @@ group goes to its first command. `(` only opens a group where a command could st
 `say (hi)`. Inside a group, a `)` without a matching `(` in the same command must be written `\)`; once a line
 uses a group, a stray `)` anywhere in it is an error rather than text.
 
+**Variables:** inside chains and `/sh` lines.
+
+```
+/sh x=11 && setblock $x 64 0 stone
+/sh home="0 80 0" ; tp @s $home
+/sh tp @s $(locate structure #minecraft:village)
+/sh say done ; say status was $?
+```
+
+`$x` / `${x}` read a variable; `my.x` and `global.x` pick a set (players have their own, the console, command
+blocks and functions share the global one; `$x` checks your own first). `$?` is `0` if the previous command
+succeeded, else `1`. `$( … )` runs a chain and inserts its value like a pipe would. `unset x` removes a variable and
+`echo text` prints it (and can be piped). Variables persist in command storage `bashcraft:vars`
+(`global` and `players.<uuid>`), so datapacks can use them with `/data`. Expansion works in `"…"` but not in `'…'`;
+`\$` is a literal `$`. An unset variable makes that command fail instead of running with a blank. Inside chains,
+`echo` and `unset` are BashCraft's even if a mod has commands with those names.
+
 ### Without `/sh`
 
 Chains also work typed directly, as long as every command after an operator starts with `/`:
