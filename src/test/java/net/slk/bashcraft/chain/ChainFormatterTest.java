@@ -47,4 +47,11 @@ class ChainFormatterTest {
     void roundTripsADoubledSlash() throws Exception {
         roundTrips("say a && //say b");
     }
+
+    @Test
+    void roundTripsSubstitutions() throws Exception {
+        roundTrips("say $(/a && /b) && /tp @s $(/x | /y) 0");
+        roundTrips("say \\$x && /say $( (/a) ; /b )");
+        assertEquals("say $(a && b) && c", ChainFormatter.toSh(NodeParser.parse("say $(a && b) && /c", NodeParser.Mode.TRANSPARENT, 32)));
+    }
 }

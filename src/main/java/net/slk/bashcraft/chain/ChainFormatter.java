@@ -35,8 +35,20 @@ public final class ChainFormatter {
         int i = 0;
         while (i < command.length()) {
             char c = command.charAt(i);
-            if ((c == '"' || c == '\'') && Tokenizer.opensQuote(command, i)) {
-                int close = Tokenizer.closingQuote(command, i);
+            if (c == '\\' && i + 1 < command.length() && command.charAt(i + 1) == '$') {
+                out.append("\\$");
+                i += 2;
+                continue;
+            }
+            if (c == '$' && i + 1 < command.length() && command.charAt(i + 1) == '(') {
+                int close = Quotes.substitutionEnd(command, i);
+                int end = close < 0 ? command.length() : close + 1;
+                out.append(command, i, end);
+                i = end;
+                continue;
+            }
+            if ((c == '"' || c == '\'') && Quotes.opensQuote(command, i)) {
+                int close = Quotes.closingQuote(command, i);
                 int end = close < 0 ? command.length() : close + 1;
                 out.append(command, i, end);
                 i = end;

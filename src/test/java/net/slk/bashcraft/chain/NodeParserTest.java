@@ -242,4 +242,28 @@ class NodeParserTest {
         assertEquals(new Node.Sequence(List.of(cmd("say :)"), cmd("say ;)")), List.of(Operator.AND)), sh("say :) && say \\;)"));
         assertEquals(new Node.Group(new Node.Sequence(List.of(cmd("say :)"), cmd("b")), List.of(Operator.OR))), sh("(say :\\) || b)"));
     }
+
+    @Test
+    void substitutionsAreNeverSplit() throws Exception {
+        assertEquals(new Node.Sequence(List.of(cmd("say $(a && b)"), cmd("c")), List.of(Operator.AND)), sh("say $(a && b) && c"));
+        assertEquals(new Node.Sequence(List.of(cmd("say $( (a) | b )"), cmd("c")), List.of(Operator.SEQ)), sh("say $( (a) | b ) ; c"));
+        assertEquals(new Node.Sequence(List.of(cmd("say $(\"x)\" && y)"), cmd("c")), List.of(Operator.SEQ)), sh("say $(\"x)\" && y) ; c"));
+    }
+
+    @Test
+    void transparentSubstitutionsAreNeverSplit() throws Exception {
+        assertEquals(new Node.Sequence(List.of(cmd("say $(a && /b)"), cmd("c")), List.of(Operator.AND)),
+                NodeParser.parse("say $(a && /b) && /c", TRANSPARENT, 32));
+    }
+
+    @Test
+    void unclosedSubstitutionIsAnError() {
+        ChainSyntaxException e = assertThrows(ChainSyntaxException.class, () -> sh("say $(a"));
+        assertEquals("unclosed '$(' at col 5", e.getMessage());
+    }
+
+    @Test
+    void escapedDollarIsKeptAndOpensNothing() throws Exception {
+        assertEquals(new Node.Sequence(List.of(cmd("say \\$(a"), cmd("b")), List.of(Operator.AND)), sh("say \\$(a && b"));
+    }
 }

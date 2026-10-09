@@ -71,8 +71,23 @@ final class Tokenizer {
                 }
                 commandStart = false;
             }
-            if ((c == '"' || c == '\'') && opensQuote(input, i)) {
-                int close = closingQuote(input, i);
+            if (c == '\\' && i + 1 < input.length() && input.charAt(i + 1) == '$') {
+                // \$ is expansion's escape: keep it for the expander, and don't let a following ( open anything.
+                appendText("\\$", i, i + 2);
+                i += 2;
+                continue;
+            }
+            if (c == '$' && i + 1 < input.length() && input.charAt(i + 1) == '(') {
+                int close = Quotes.substitutionEnd(input, i);
+                if (close < 0) {
+                    throw new ChainSyntaxException("unclosed '$('", i + 1);
+                }
+                appendText(input.substring(i, close + 1), i, close + 1);
+                i = close + 1;
+                continue;
+            }
+            if ((c == '"' || c == '\'') && Quotes.opensQuote(input, i)) {
+                int close = Quotes.closingQuote(input, i);
                 if (close < 0) {
                     throw new ChainSyntaxException("unclosed " + c, i + 1);
                 }
@@ -185,24 +200,5 @@ final class Tokenizer {
         text.setLength(0);
         textStart = -1;
         textEnd = -1;
-    }
-
-    /** A quote opens a quoted span unless it follows a letter or digit (so "don't" stays plain text). */
-    static boolean opensQuote(String input, int i) {
-        return i == 0 || !Character.isLetterOrDigit(input.charAt(i - 1));
-    }
-
-    /** Index of the matching quote, skipping backslash-escaped characters; -1 if unclosed. */
-    static int closingQuote(String input, int start) {
-        char quote = input.charAt(start);
-        for (int j = start + 1; j < input.length(); j++) {
-            char c = input.charAt(j);
-            if (c == '\\') {
-                j++;
-            } else if (c == quote) {
-                return j;
-            }
-        }
-        return -1;
     }
 }
