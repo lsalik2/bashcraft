@@ -73,7 +73,8 @@ public final class ChainExecutor {
     }
 
     /** A value piped into a node and the producing command's numeric result ({result}). */
-    private record Piped(PipeValue value, int result) {}
+    /** A value piped into a node, the producing command's numeric result ({result}), and the items grep/each work on. */
+    private record Piped(PipeValue value, int result, List<String> items) {}
 
     /** What running a node produced; lastCommand is the text of the last command that ran. */
     private record Outcome(ExecResult result, String lastCommand) {}
@@ -122,14 +123,14 @@ public final class ChainExecutor {
                     return previous;
                 }
                 Node stage = stages.get(i);
-                PipeValue value;
+                Piped piped;
                 try {
-                    value = PipeResolver.resolve(previous.result().output());
+                    piped = piped(previous.result());
                 } catch (PipeException e) {
                     runner.reportError(label(firstCommand(stage)) + "nothing to pipe from /" + previous.lastCommand());
                     return new Outcome(ExecResult.failure(), previous.lastCommand());
                 }
-                previous = node(stage, new Piped(value, previous.result().result()), i < stages.size() - 1 || feedsPipe);
+                previous = node(stage, piped, i < stages.size() - 1 || feedsPipe);
             }
             return previous;
         }
@@ -137,14 +138,24 @@ public final class ChainExecutor {
         private Outcome command(Node.Command command, Piped input, boolean feedsPipe) {
             Builtins.Call call = Builtins.classify(command.text());
             String text = call.argument();
-            if (call.kind() != Builtins.Kind.UNSET) {
+            if (call.kind() != Builtins.Kind.UNSET && call.kind() != Builtins.Kind.EACH) {
                 try {
+                    boolean takesPipe = call.kind() != Builtins.Kind.GREP && call.kind() != Builtins.Kind.STORE;
                     Expander.Expansion expansion = Expander.expandParts(text, variables, lastStatus, this::substitute,
-                            input == null ? null : new Expander.PipeInput(input.value(), input.result()));
+                            input == null || !takesPipe ? null : new Expander.PipeInput(input.value(), input.result()));
                     text = finalText(call, command.text(), expansion);
                 } catch (ExpansionException e) {
                     runner.reportError(label(command) + e.getMessage());
                     return finish(ExecResult.failure(), command);
+                }
+            }
+            if (call.kind() == Builtins.Kind.GREP || call.kind() == Builtins.Kind.STORE || call.kind() == Builtins.Kind.EACH) {
+                if (input == null) {
+                    runner.reportError(label(command) + call.kind().name().toLowerCase(java.util.Locale.ROOT) + " needs piped input");
+                    return finish(ExecResult.failure(), command);
+                }
+                if (call.kind() == Builtins.Kind.EACH) {
+                    return finish(each(command, text, input, feedsPipe), command);
                 }
             }
             if (!DepthGuard.spend(maxTotalCommands)) {
@@ -158,6 +169,9 @@ public final class ChainExecutor {
                 case ECHO -> runner.echo(text, options);
                 case ASSIGN -> assign(command, call.name(), Builtins.unquote(text.strip()));
                 case UNSET -> unset(command, call.name());
+                case GREP -> grep(command, text, input);
+                case STORE -> store(command, text, input, options);
+                case EACH -> throw new IllegalStateException("each is handled above");
             };
             return finish(result, command);
         }
@@ -181,6 +195,81 @@ public final class ChainExecutor {
                 }
             }
             return runsCommands ? expansion.join(true) : plain;
+        }
+
+        /** What the next stage receives: a builtin's ready-made value, else the value extracted from the output. */
+        private Piped piped(ExecResult result) throws PipeException {
+            if (result.value() != null) {
+                return new Piped(result.value(), result.result(), result.value().items());
+            }
+            List<String> items = PipeResolver.items(result.output());
+            return new Piped(PipeResolver.resolve(result.output()), result.result(), items);
+        }
+
+        /** grep [-v] [-x] TEXT: keep matching items (case-insensitive substring, or whole item with -x). */
+        private ExecResult grep(Node.Command command, String arguments, Piped input) {
+            boolean invert = false;
+            boolean exact = false;
+            String rest = arguments.strip();
+            while (rest.startsWith("-v ") || rest.startsWith("-x ") || rest.equals("-v") || rest.equals("-x")) {
+                invert |= rest.startsWith("-v");
+                exact |= rest.startsWith("-x");
+                rest = rest.length() > 2 ? rest.substring(3).strip() : "";
+            }
+            if (rest.isEmpty()) {
+                runner.reportError(label(command) + "grep needs a pattern");
+                return ExecResult.failure();
+            }
+            String pattern = rest.toLowerCase(java.util.Locale.ROOT);
+            List<String> kept = new java.util.ArrayList<>();
+            for (String item : input.items()) {
+                String lower = item.toLowerCase(java.util.Locale.ROOT);
+                boolean matches = exact ? lower.equals(pattern) : lower.contains(pattern);
+                if (matches != invert) {
+                    kept.add(item);
+                }
+            }
+            return new ExecResult(!kept.isEmpty(), false, kept.size(), List.of(), new PipeValue.Items(kept));
+        }
+
+        /** store score HOLDER OBJECTIVE | store storage ID PATH, by running the vanilla command as the same source. */
+        private ExecResult store(Node.Command command, String arguments, Piped input, RunOptions options) {
+            String text = arguments.strip();
+            String vanilla;
+            if (text.startsWith("score ") && text.lastIndexOf(' ') > 6) {
+                String holder = text.substring(6, text.lastIndexOf(' ')).strip();
+                String objective = text.substring(text.lastIndexOf(' ') + 1);
+                java.util.OptionalLong number = scoreNumber(input.value());
+                if (number.isEmpty()) {
+                    runner.reportError(label(command) + "store score needs a number");
+                    return ExecResult.failure();
+                }
+                vanilla = "scoreboard players set " + holder + " " + objective + " " + number.getAsLong();
+            } else if (text.startsWith("storage ") && text.indexOf(' ', 8) > 8) {
+                String id = text.substring(8, text.indexOf(' ', 8));
+                String path = text.substring(text.indexOf(' ', 8) + 1).strip();
+                vanilla = "data modify storage " + id + " " + path + " set value " + Snbt.of(input.value());
+            } else {
+                runner.reportError(label(command) + "store needs score HOLDER OBJECTIVE or storage ID PATH");
+                return ExecResult.failure();
+            }
+            ExecResult result = runner.run(vanilla, options);
+            return new ExecResult(result.success(), result.errored(), result.result(), List.of(), input.value());
+        }
+
+        /** A number for store score: a numeric value, or a one-item list whose item is a number; rounded down. */
+        private static java.util.OptionalLong scoreNumber(PipeValue value) {
+            List<String> items = value.items();
+            if (items.size() == 1 && items.getFirst().matches("-?\\d+(\\.\\d+)?")) {
+                return java.util.OptionalLong.of((long) Math.floor(Double.parseDouble(items.getFirst())));
+            }
+            return java.util.OptionalLong.empty();
+        }
+
+        /** Implemented in Task 3. */
+        private ExecResult each(Node.Command command, String body, Piped input, boolean feedsPipe) {
+            runner.reportError(label(command) + "each needs a command");
+            return ExecResult.failure();
         }
 
         private Outcome finish(ExecResult result, Node.Command command) {
@@ -234,7 +323,7 @@ public final class ChainExecutor {
                     throw new ExpansionException("$(…) produced no value");
                 }
                 try {
-                    return PipeResolver.resolve(result.output()).asArgument();
+                    return piped(result).value().asArgument();
                 } catch (PipeException e) {
                     throw new ExpansionException("$(…) produced no value");
                 }

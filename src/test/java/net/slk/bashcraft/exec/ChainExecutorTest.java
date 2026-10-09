@@ -463,4 +463,54 @@ class ChainExecutorTest {
         run(r, elevated(Map.of("a", "312 ~ -1040", "b", "^ ^1.5 ^", "c", "~-2 +3 .5"), Map.of()), "tp @s $my.a ; tp @s $my.b ; tp @s $my.c");
         assertEquals(List.of("tp @s 312 ~ -1040", "tp @s ^ ^1.5 ^", "tp @s ~-2 +3 .5"), r.ran);
     }
+
+    private static Feedback players(String... names) {
+        return Feedback.translatable("commands.list.players", "x", names.length, 20, Feedback.plain(String.join(", ", names)));
+    }
+
+    @Test
+    void grepKeepsMatchingItems() throws Exception {
+        FakeRunner r = new FakeRunner().on("list", new ExecResult(true, 2, List.of(players("Alex", "Steve"))));
+        run(r, table(), "list | grep steve | say ; list | grep -v alex | say ; list | grep -x ALEX | say");
+        assertEquals(List.of("list", "say Steve", "list", "say Steve", "list", "say Alex"), r.ran);
+    }
+
+    @Test
+    void grepStatusDrivesOperators() throws Exception {
+        FakeRunner r = new FakeRunner().on("list", new ExecResult(true, 2, List.of(players("Alex", "Steve"))));
+        run(r, table(), "list | grep zed || say none ; list | grep -x ale || say exact only");
+        assertEquals(List.of("list", "say none", "list", "say exact only"), r.ran);
+    }
+
+    @Test
+    void pipeBuiltinsNeedInputAndArguments() throws Exception {
+        FakeRunner r = new FakeRunner().on("list", new ExecResult(true, 2, List.of(players("Alex"))));
+        run(r, table(), "grep x ; list | grep ; list | store nowhere");
+        assertEquals(List.of("[1] grep needs piped input", "[3] grep needs a pattern", "[5] store needs score HOLDER OBJECTIVE or storage ID PATH"), r.errors);
+    }
+
+    @Test
+    void storeScoreRoundsDown() throws Exception {
+        FakeRunner r = new FakeRunner()
+                .on("a", new ExecResult(true, 1, List.of(Feedback.plain("12.7"))))
+                .on("b", new ExecResult(true, 1, List.of(Feedback.plain("-3.5"))))
+                .on("c", new ExecResult(true, 1, List.of(Feedback.plain("hello"))));
+        run(r, table(), "a | store score @s best ; b | store score @e[type=cow, limit=1] best ; c | store score @s best");
+        assertEquals(List.of("a", "scoreboard players set @s best 12", "b", "scoreboard players set @e[type=cow, limit=1] best -4", "c"), r.ran);
+        assertEquals(List.of("[6] store score needs a number"), r.errors);
+    }
+
+    @Test
+    void storeStorageWritesSnbtAndPassesTheValueOn() throws Exception {
+        FakeRunner r = new FakeRunner().on("list", new ExecResult(true, 2, List.of(players("Alex", "Steve"))));
+        run(r, table(), "list | store storage bashcraft:test names | say");
+        assertEquals(List.of("list", "data modify storage bashcraft:test names set value [\"Alex\",\"Steve\"]", "say Alex Steve"), r.ran);
+    }
+
+    @Test
+    void storeArgumentsDontGetThePipedValue() throws Exception {
+        FakeRunner r = new FakeRunner().on("a", new ExecResult(true, 1, List.of(Feedback.plain("7"))));
+        run(r, table(), "o=best ; a | store score @s $o");
+        assertEquals("scoreboard players set @s best 7", r.ran.get(1));
+    }
 }

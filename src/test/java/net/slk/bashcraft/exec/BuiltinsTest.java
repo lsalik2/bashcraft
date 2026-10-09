@@ -35,4 +35,14 @@ class BuiltinsTest {
         assertEquals("\"a'", Builtins.unquote("\"a'"));
         assertEquals("\"", Builtins.unquote("\""));
     }
+
+    @Test
+    void pipeBuiltins() {
+        assertEquals(new Builtins.Call(Builtins.Kind.GREP, "", "-v Steve"), Builtins.classify("grep -v Steve"));
+        assertEquals(new Builtins.Call(Builtins.Kind.GREP, "", ""), Builtins.classify("grep"));
+        assertEquals(new Builtins.Call(Builtins.Kind.STORE, "", "score @s best"), Builtins.classify("store score @s best"));
+        assertEquals(new Builtins.Call(Builtins.Kind.EACH, "", "msg {value} hi"), Builtins.classify("each msg {value} hi"));
+        assertEquals(Builtins.Kind.NONE, Builtins.classify("grepper x").kind());
+        assertEquals(Builtins.Kind.NONE, Builtins.classify("storefront").kind());
+    }
 }
