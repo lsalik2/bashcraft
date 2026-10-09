@@ -54,11 +54,16 @@ public final class ChainStyles {
                 fill(styles, span.start(), span.end(), SYNTAX);
                 continue;
             }
-            if (Builtins.classify(value.substring(span.start(), span.end())).kind() != Builtins.Kind.NONE) {
+            int start = span.start();
+            Builtins.Kind kind = Builtins.classify(value.substring(span.start(), span.end())).kind();
+            if (kind == Builtins.Kind.EACH && span.end() - span.start() > 5) {
+                // each's body is an ordinary command: colour it like one.
+                start = span.start() + 5;
+            } else if (kind != Builtins.Kind.NONE) {
                 continue;
             }
             StringReader reader = new StringReader(masked.substring(0, span.end()));
-            reader.setCursor(span.start());
+            reader.setCursor(start);
             ParseResults<S> parse = dispatcher.parse(reader, source);
             hasMessages |= isMessage.test(parse);
             int color = -1;

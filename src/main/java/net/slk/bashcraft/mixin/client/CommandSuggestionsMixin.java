@@ -87,8 +87,14 @@ public abstract class CommandSuggestionsMixin {
         }
         try {
             ChainLayout.Window window = layout.window(input.getCursorPosition());
+            int start = window.start();
+            if (window.start() < window.end() && bashcraft$kindAt(window) == Builtins.Kind.EACH
+                    && input.getCursorPosition() >= window.start() + 5) {
+                // In each's body, complete the body as a command of its own.
+                start = window.start() + 5;
+            }
             StringReader command = new StringReader(Placeholders.mask(Expander.mask(input.getValue().substring(0, window.end()))));
-            command.setCursor(window.start());
+            command.setCursor(start);
             return original.call(dispatcher, command, source);
         } catch (RuntimeException e) {
             ClientHooks.failed(e);
@@ -151,12 +157,20 @@ public abstract class CommandSuggestionsMixin {
         }
     }
 
-    /** Whether the command under the cursor is a BashCraft builtin (x=…, unset, echo), which vanilla can't parse. */
+    /** Whether the cursor is in a builtin vanilla can't parse (x=…, unset, echo, grep, store; each's own word). */
     @Unique
     private boolean bashcraft$builtinAt(ChainLayout layout, int cursor) {
         ChainLayout.Window window = layout.window(cursor);
+        if (window.start() >= window.end()) {
+            return false;
+        }
+        Builtins.Kind kind = bashcraft$kindAt(window);
+        return kind != Builtins.Kind.NONE && !(kind == Builtins.Kind.EACH && cursor >= window.start() + 5);
+    }
+
+    @Unique
+    private Builtins.Kind bashcraft$kindAt(ChainLayout.Window window) {
         String value = input.getValue();
-        return window.start() < window.end()
-                && Builtins.classify(value.substring(window.start(), Math.min(window.end(), value.length())).strip()).kind() != Builtins.Kind.NONE;
+        return Builtins.classify(value.substring(window.start(), Math.min(window.end(), value.length())).strip()).kind();
     }
 }

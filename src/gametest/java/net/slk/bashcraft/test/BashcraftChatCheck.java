@@ -57,6 +57,12 @@ public class BashcraftChatCheck implements FabricClientGameTest {
                     "variables, substitutions and assignments are not shown as errors");
             context.takeScreenshot("bashcraft-variables");
 
+            context.runOnClient(client -> ChatProbe.open(client, "/sh list | each gamemode "));
+            context.waitFor(client -> ChatProbe.completions(client).contains("creative"), 100);
+            context.runOnClient(client -> ChatProbe.open(client, "/sh list | grep x | each tp @s ~ ~1 ~ | store storage bashcraft:t v"));
+            context.waitTicks(2);
+            check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "pipe builtins are not shown as errors");
+
             context.runOnClient(client -> ChatProbe.open(client, "/tp @s ~ ~ ~"));
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "a vanilla line is unchanged");
