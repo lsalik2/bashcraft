@@ -2,6 +2,8 @@ package net.slk.bashcraft.pipe;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class PlaceholdersTest {
@@ -49,5 +51,24 @@ class PlaceholdersTest {
     void placeholderTheValueLacksIsAnError() {
         PipeException e = assertThrows(PipeException.class, () -> Placeholders.inject("tp @s {x} 0 0", new PipeValue.Numeric("5"), 5));
         assertEquals("{x} is not available from a number", e.getMessage());
+    }
+
+    @Test
+    void maskKeepsLength() {
+        assertEquals("tp @s 000 150 000", Placeholders.mask("tp @s {x} 150 {z}"));
+        assertEquals("say 0000000 00000000", Placeholders.mask("say {value} {result}"));
+        assertEquals("summon zombie {NoAI:1b}", Placeholders.mask("summon zombie {NoAI:1b}"));
+    }
+
+    @Test
+    void escapedPlaceholdersAreNotMasked() {
+        assertEquals("say \\{x} 000", Placeholders.mask("say \\{x} {y}"));
+        assertEquals(List.of(9, 12), Placeholders.ranges("say \\{x} {y}").stream().map(r -> List.of(r[0], r[1])).toList().getFirst());
+    }
+
+    @Test
+    void rangesFindEveryPlaceholder() {
+        assertEquals(List.of(List.of(6, 9), List.of(14, 17)),
+                Placeholders.ranges("tp @s {x} 150 {z}").stream().map(r -> List.of(r[0], r[1])).toList());
     }
 }

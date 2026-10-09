@@ -1,5 +1,7 @@
 package net.slk.bashcraft.pipe;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,5 +34,28 @@ public final class Placeholders {
         m.appendTail(out);
         String result = out.toString();
         return substituted ? result : result.stripTrailing() + " " + value.asArgument();
+    }
+
+    /** {@code command} with each placeholder replaced by zeros of the same length, so a client-side parse accepts it. */
+    public static String mask(String command) {
+        StringBuilder out = new StringBuilder(command);
+        for (int[] range : ranges(command)) {
+            for (int i = range[0]; i < range[1]; i++) {
+                out.setCharAt(i, '0');
+            }
+        }
+        return out.toString();
+    }
+
+    /** {@code {start, end}} of each placeholder (escaped ones excluded), in order. */
+    public static List<int[]> ranges(String command) {
+        List<int[]> ranges = new ArrayList<>();
+        Matcher m = TOKEN.matcher(command);
+        while (m.find()) {
+            if (!m.group().startsWith("\\")) {
+                ranges.add(new int[] {m.start(), m.end()});
+            }
+        }
+        return ranges;
     }
 }
