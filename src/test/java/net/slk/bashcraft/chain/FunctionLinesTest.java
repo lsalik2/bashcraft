@@ -51,4 +51,10 @@ class FunctionLinesTest {
         assertEquals(List.of("sh (say a ; say b) && say c"), rewrite("(say a ; /say b) && /say c"));
         assertEquals(List.of("sh (say a || say b) && say c", ""), rewrite("(say a || \\", "/say b) && /say c"));
     }
+
+    @Test
+    void backgroundLinesBecomeShLinesAndLiteralAmpersandsStayText() {
+        assertEquals(List.of("sh say a & say b"), rewrite("say a & /say b"));
+        assertEquals(List.of("sh say Tom \\& Jerry && say b"), rewrite("say Tom & Jerry && /say b"));
+    }
 }

@@ -9,7 +9,7 @@ import java.util.List;
  * the current command's text, and a group is open).
  */
 final class Tokenizer {
-    enum Kind { TEXT, AND, OR, PIPE, SEQ, OPEN, CLOSE, END }
+    enum Kind { TEXT, AND, OR, PIPE, SEQ, BACKGROUND, OPEN, CLOSE, END }
 
     /** @param column 1-based column of the token (for text: of its first non-space character) */
     /** @param start index of the token's first character (for text: first non-space); @param end exclusive */
@@ -95,6 +95,12 @@ final class Tokenizer {
                 i = close + 1;
                 continue;
             }
+            if (c == '\\' && input.startsWith("&&", i + 1)) {
+                // \&& has always meant a literal && (from before a lone & was an operator).
+                appendText("&&", i, i + 3);
+                i += 3;
+                continue;
+            }
             if (c == '\\' && i + 1 < input.length() && ESCAPABLE.indexOf(input.charAt(i + 1)) >= 0) {
                 appendText(String.valueOf(input.charAt(i + 1)), i, i + 2);
                 i += 2;
@@ -155,6 +161,7 @@ final class Tokenizer {
         char c = input.charAt(i);
         if (c == '|') return Kind.PIPE;
         if (c == ';') return Kind.SEQ;
+        if (c == '&') return Kind.BACKGROUND;
         return null;
     }
 

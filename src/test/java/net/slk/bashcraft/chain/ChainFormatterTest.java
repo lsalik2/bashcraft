@@ -2,6 +2,8 @@ package net.slk.bashcraft.chain;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ChainFormatterTest {
@@ -53,5 +55,15 @@ class ChainFormatterTest {
         roundTrips("say $(/a && /b) && /tp @s $(/x | /y) 0");
         roundTrips("say \\$x && /say $( (/a) ; /b )");
         assertEquals("say $(a && b) && c", ChainFormatter.toSh(NodeParser.parse("say $(a && b) && /c", NodeParser.Mode.TRANSPARENT, 32)));
+    }
+
+    @Test
+    void formatsBackgroundAndRoundTrips() throws Exception {
+        for (String chain : List.of("a && b & c", "a ; b & c", "(sleep 20 ; say a &) && b", "a &", "a | b & c")) {
+            Node node = NodeParser.parse(chain, NodeParser.Mode.SH, 32);
+            assertEquals(chain, ChainFormatter.toSh(node));
+            assertEquals(node, NodeParser.parse(ChainFormatter.toSh(node), NodeParser.Mode.SH, 32), chain);
+        }
+        assertEquals("say Tom \\& Jerry", ChainFormatter.toSh(new Node.Command("say Tom & Jerry")));
     }
 }

@@ -68,8 +68,8 @@ class NodeParserTest {
     }
 
     @Test
-    void singleAmpersandIsLiteral() throws Exception {
-        assertEquals(List.of(List.of("say a & b")), Flat.commands(sh("say a & b")));
+    void escapedSingleAmpersandIsLiteral() throws Exception {
+        assertEquals(List.of(List.of("say a & b")), Flat.commands(sh("say a \\& b")));
     }
 
     @Test
@@ -265,5 +265,43 @@ class NodeParserTest {
     @Test
     void escapedDollarIsKeptAndOpensNothing() throws Exception {
         assertEquals(new Node.Sequence(List.of(cmd("say \\$(a"), cmd("b")), List.of(Operator.AND)), sh("say \\$(a && b"));
+    }
+
+    @Test
+    void backgroundClosesTheAndOrListBeforeIt() throws Exception {
+        assertEquals(new Node.Sequence(List.of(
+                new Node.Background(new Node.Sequence(List.of(cmd("a"), cmd("b")), List.of(Operator.AND))), cmd("c")),
+                List.of(Operator.SEQ)), sh("a && b & c"));
+        assertEquals(new Node.Sequence(List.of(cmd("a"), new Node.Background(cmd("b")), cmd("c")),
+                List.of(Operator.SEQ, Operator.SEQ)), sh("a ; b & c"));
+        assertEquals(new Node.Sequence(List.of(new Node.Background(new Node.Pipeline(List.of(cmd("a"), cmd("b")))), cmd("c")),
+                List.of(Operator.SEQ)), sh("a | b & c"));
+    }
+
+    @Test
+    void trailingBackgroundAndEscapes() throws Exception {
+        assertEquals(new Node.Background(cmd("a")), sh("a &"));
+        assertEquals(new Node.Sequence(List.of(cmd("a"), new Node.Background(cmd("b"))), List.of(Operator.SEQ)), sh("a ; b &"));
+        assertEquals(new Node.Sequence(List.of(
+                new Node.Group(new Node.Sequence(List.of(cmd("sleep 20"), new Node.Background(cmd("say a"))), List.of(Operator.SEQ))),
+                cmd("b")), List.of(Operator.AND)), sh("(sleep 20 ; say a &) && b"));
+        assertEquals(cmd("say Tom & Jerry"), sh("say Tom \\& Jerry"));
+        assertEquals(cmd("say \"Tom & Jerry\""), sh("say \"Tom & Jerry\""));
+        assertEquals(cmd("say use && here"), sh("say use \\&& here"));
+    }
+
+    @Test
+    void misplacedBackgroundIsAnError() {
+        assertEquals("unexpected '&' at col 1", assertThrows(ChainSyntaxException.class, () -> sh("& a")).getMessage());
+        assertEquals("unexpected '&' at col 5", assertThrows(ChainSyntaxException.class, () -> sh("a & & b")).getMessage());
+        assertEquals("unexpected ';' at col 5", assertThrows(ChainSyntaxException.class, () -> sh("a & ; b")).getMessage());
+    }
+
+    @Test
+    void backgroundInTransparentModeNeedsASlash() throws Exception {
+        assertEquals(new Node.Sequence(List.of(new Node.Background(cmd("a")), cmd("b")), List.of(Operator.SEQ)),
+                NodeParser.parse("/a & /b", TRANSPARENT, 32));
+        assertEquals(cmd("say Tom & Jerry"), NodeParser.parse("/say Tom & Jerry", TRANSPARENT, 32));
+        assertEquals(cmd("say hi &"), NodeParser.parse("/say hi &", TRANSPARENT, 32));
     }
 }

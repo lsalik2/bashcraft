@@ -11,15 +11,17 @@ public final class ChainFormatter {
             case Node.Sequence sequence -> {
                 StringBuilder out = new StringBuilder(toSh(sequence.items().getFirst()));
                 for (int i = 1; i < sequence.items().size(); i++) {
+                    boolean afterBackground = sequence.items().get(i - 1) instanceof Node.Background;
                     out.append(switch (sequence.joins().get(i - 1)) {
                         case AND -> " && ";
                         case OR -> " || ";
-                        case SEQ -> " ; ";
+                        case SEQ -> afterBackground ? " " : " ; ";
                     }).append(toSh(sequence.items().get(i)));
                 }
                 yield out.toString();
             }
             case Node.Group group -> "(" + toSh(group.body()) + ")";
+            case Node.Background background -> toSh(background.body()) + " &";
         };
     }
 

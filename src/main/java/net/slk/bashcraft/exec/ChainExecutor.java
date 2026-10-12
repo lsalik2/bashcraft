@@ -72,6 +72,7 @@ public final class ChainExecutor {
             case Node.Pipeline pipeline -> pipeline.stages().forEach(stage -> number(stage, numbers));
             case Node.Sequence sequence -> sequence.items().forEach(item -> number(item, numbers));
             case Node.Group group -> number(group.body(), numbers);
+            case Node.Background background -> number(background.body(), numbers);
         }
     }
 
@@ -81,6 +82,7 @@ public final class ChainExecutor {
             case Node.Pipeline pipeline -> firstCommand(pipeline.stages().getFirst());
             case Node.Sequence sequence -> firstCommand(sequence.items().getFirst());
             case Node.Group group -> firstCommand(group.body());
+            case Node.Background background -> firstCommand(background.body());
         };
     }
 
@@ -117,6 +119,7 @@ public final class ChainExecutor {
                 case Node.Pipeline pipeline -> pipeline(pipeline, input, feedsPipe);
                 case Node.Sequence sequence -> sequence(sequence, input, feedsPipe);
                 case Node.Group group -> node(group.body(), input, feedsPipe);
+                case Node.Background background -> background(background, input, feedsPipe);
             };
         }
 
@@ -134,6 +137,13 @@ public final class ChainExecutor {
                 }
             }
             return status;
+        }
+
+        /** body &: the status after it is success, as in bash (spec C3 §3). */
+        private Outcome background(Node.Background background, Piped input, boolean feedsPipe) {
+            Outcome body = node(background.body(), input, feedsPipe);
+            lastStatus = 0;
+            return new Outcome(new ExecResult(true, 1, List.of()), body.lastCommand());
         }
 
         private Outcome pipeline(Node.Pipeline pipeline, Piped input, boolean feedsPipe) {
@@ -492,6 +502,7 @@ public final class ChainExecutor {
                 case Node.Pipeline pipeline -> new Node.Pipeline(replaceLast(pipeline.stages()));
                 case Node.Sequence sequence -> new Node.Sequence(replaceLast(sequence.items()), sequence.joins());
                 case Node.Group group -> new Node.Group(appendArguments(group.body()));
+                case Node.Background background -> new Node.Background(appendArguments(background.body()));
             };
         }
 

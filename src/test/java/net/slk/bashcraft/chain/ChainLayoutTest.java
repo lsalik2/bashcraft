@@ -91,4 +91,10 @@ class ChainLayoutTest {
         assertTrue(layout.commandCanStartAt(13), "after '&& '");
         assertTrue(layout.commandCanStartAt(16), "inside a command");
     }
+
+    @Test
+    void backgroundIsAnOperator() {
+        assertEquals(List.of(new Span(Kind.COMMAND, 4, 5), new Span(Kind.OPERATOR, 6, 7), new Span(Kind.COMMAND, 8, 9)),
+                ChainLayout.forInput("/sh a & b", false).orElseThrow().spans());
+    }
 }

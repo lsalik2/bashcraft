@@ -8,8 +8,9 @@ import java.util.List;
 
 /**
  * Recursive-descent parser for chains (spec §2). {@code &&}, {@code ||} and {@code ;} are kept in one left-to-right
- * {@link Node.Sequence}: evaluating them in order with bash's status rules gives the same result as nesting
- * {@code &&}/{@code ||} inside {@code ;}.
+ * {@link Node.Sequence}; {@code &} wraps the {@code &&}/{@code ||} list before it in a {@link Node.Background}.
+ * Evaluating them in order with bash's status rules gives the same result as nesting {@code &&}/{@code ||} inside
+ * {@code ;}.
  */
 public final class NodeParser {
     public enum Mode {
@@ -47,8 +48,22 @@ public final class NodeParser {
     private Node sequence() throws ChainSyntaxException {
         List<Node> items = new ArrayList<>(List.of(pipeline()));
         List<Operator> joins = new ArrayList<>();
+        // The first item of the current &&/|| list: an '&' backgrounds the items from here on (bash's precedence).
+        int listStart = 0;
         while (true) {
-            Operator op = switch (peek().kind()) {
+            Kind kind = peek().kind();
+            if (kind == Kind.BACKGROUND) {
+                lastOperator = next();
+                background(items, joins, listStart);
+                if (peek().kind() == Kind.END || peek().kind() == Kind.CLOSE) {
+                    break;
+                }
+                joins.add(Operator.SEQ);
+                items.add(pipeline());
+                listStart = items.size() - 1;
+                continue;
+            }
+            Operator op = switch (kind) {
                 case AND -> Operator.AND;
                 case OR -> Operator.OR;
                 case SEQ -> Operator.SEQ;
@@ -60,8 +75,20 @@ public final class NodeParser {
             lastOperator = next();
             items.add(pipeline());
             joins.add(op);
+            if (op == Operator.SEQ) {
+                listStart = items.size() - 1;
+            }
         }
         return items.size() == 1 ? items.getFirst() : new Node.Sequence(items, joins);
+    }
+
+    /** Replaces items[from…] (one &&/|| list) and the joins between them with one Background item. */
+    private static void background(List<Node> items, List<Operator> joins, int from) {
+        List<Node> list = new ArrayList<>(items.subList(from, items.size()));
+        List<Operator> listJoins = new ArrayList<>(joins.subList(from, joins.size()));
+        items.subList(from, items.size()).clear();
+        joins.subList(from, joins.size()).clear();
+        items.add(new Node.Background(list.size() == 1 ? list.getFirst() : new Node.Sequence(list, listJoins)));
     }
 
     private Node pipeline() throws ChainSyntaxException {

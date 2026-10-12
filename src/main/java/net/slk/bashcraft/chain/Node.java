@@ -71,4 +71,17 @@ public sealed interface Node {
             return true;
         }
     }
+
+    /** {@code body &}: if the body pauses, its waiting part goes on by itself and the chain carries on (spec C3 §3). */
+    record Background(Node body) implements Node {
+        @Override
+        public int commandCount() {
+            return body.commandCount();
+        }
+
+        @Override
+        public boolean containsGroup() {
+            return body.containsGroup();
+        }
+    }
 }

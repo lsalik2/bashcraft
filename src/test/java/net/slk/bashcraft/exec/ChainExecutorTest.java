@@ -742,4 +742,12 @@ class ChainExecutorTest {
         run(r, typedShell(aliases(), null), "alias f = 'say $(echo $1)' ; f a", 8);
         assertEquals(List.of("say a"), r.ran);
     }
+
+    @Test
+    void backgroundWithoutPausesRunsInOrderAndSucceeds() throws Exception {
+        FakeRunner r = new FakeRunner().on("a", FAIL);
+        ExecResult result = run(r, "a & b && c ; a &");
+        assertEquals(List.of("a", "b", "c", "a"), r.ran);
+        assertTrue(result.success(), "the status after & is success");
+    }
 }

@@ -31,7 +31,7 @@ public record ChainLayout(List<Span> spans, Optional<ChainSyntaxException> error
                 case TEXT -> Kind.COMMAND;
                 case OPEN -> Kind.GROUP_OPEN;
                 case CLOSE -> Kind.GROUP_CLOSE;
-                case AND, OR, PIPE, SEQ -> Kind.OPERATOR;
+                case AND, OR, PIPE, SEQ, BACKGROUND -> Kind.OPERATOR;
                 case END -> null;
             };
             if (kind == null) {
