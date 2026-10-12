@@ -71,7 +71,7 @@ public final class ServerJobs {
         Optional<CommandSourceStack> source = sourceOf(server, due.payload());
         View jobs = new View(source.orElse(null), due);
         try {
-            source.ifPresent(stack -> resume(stack, jobs, due.payload().continuation()));
+            source.ifPresent(stack -> resume(stack, jobs, due.payload()));
         } catch (RuntimeException e) {
             // An exception out of a tick handler would stop the server; the broken job just ends.
             Bashcraft.LOGGER.error("BashCraft: waiting chain %{} failed", due.number(), e);
@@ -82,17 +82,23 @@ public final class ServerJobs {
         }
     }
 
-    private static void resume(CommandSourceStack source, View jobs, Continuation continuation) {
+    private static void resume(CommandSourceStack source, View jobs, Waiting waiting) {
         BashcraftConfig config = BashcraftConfig.get();
-        Optional<DepthGuard.Scope> scope = DepthGuard.enter(config.maxDepth);
+        // A player's waiting chains share one budget per second, so timers can't multiply what they can run.
+        String owner = waiting.typist() == null ? null : waiting.typist().toString();
+        Optional<DepthGuard.Scope> scope = DepthGuard.enter(config.maxDepth, table.budgetSpent(owner));
         if (scope.isEmpty()) {
             return;
         }
         try (DepthGuard.Scope ignored = scope.get()) {
             ShellContext shell = new ShellContext(StorageVariables.of(source), StorageAliases.of(source),
                     Sources.typist(source).map(HistoryBook::of).orElse(null), jobs);
-            new ChainExecutor(new MinecraftCommandRunner(source), shell, config.swallowPipedOutput, config.maxTotalCommands,
-                    config.maxDepth).resume(continuation);
+            try {
+                new ChainExecutor(new MinecraftCommandRunner(source), shell, config.swallowPipedOutput, config.maxTotalCommands,
+                        config.maxDepth).resume(waiting.continuation());
+            } finally {
+                table.setBudgetSpent(owner, DepthGuard.spent());
+            }
         }
     }
 

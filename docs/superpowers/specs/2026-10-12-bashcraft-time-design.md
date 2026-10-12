@@ -19,7 +19,7 @@
 2. `&` lets part of a chain wait on its own while the rest carries on.
 3. Players list and cancel their own waiting chains; operators manage everyone's.
 4. A waiting chain never gains anything: a typed chain resumes with the player's current permission, others with
-   the permission they started with, and jobs are bounded in length, number and work per wake.
+   the permission they started with, and jobs are bounded in length, number and work per second.
 
 ## 2. `sleep`
 
@@ -88,7 +88,9 @@
 - `ChainExecutor.resume(continuation)` runs the frames innermost first; each frame's outcome decides the `&&`/`||`
   of the frame outside it. A pause during a resume appends the outer frames still waiting, and the job keeps its
   number.
-- Every wake gets a fresh `maxTotalCommands` budget. The alias levels a resumed job is still inside — those with
+- A player's waiting chains share one `maxTotalCommands` budget per second (20 ticks of the job clock); a server
+  job gets a fresh budget each wake (changed after review: per wake let 8 one-tick timers multiply what a player can
+  run). The alias levels a resumed job is still inside — those with
   frames, i.e. commands still to run — count toward `maxDepth` as if it had never paused, so
   `alias t = echo hi ; sleep 20 ; t ; echo after` stops at `aliases nested deeper than N` instead of growing
   forever. A list with nothing left adds no frame, so a timer that calls itself last stays one level deep and keeps
@@ -118,7 +120,7 @@ tick, then number.
 | `maxSleepTicks` | 72000 | one sleep |
 | `maxJobsPerPlayer` | 8 | waiting chains a player typed |
 | `maxJobs` | 64 | all waiting chains |
-| `maxTotalCommands` (existing) | 256 | commands per wake |
+| `maxTotalCommands` (existing) | 256 | commands per second for a player's waiting chains together; per wake for the server's |
 
 A job belongs to the player who typed its chain; any other job (command block, function, console, `execute as`)
 belongs to the server and is shown with its source's name (`@`, `Server`). A job counts toward its owner's limit
@@ -128,10 +130,12 @@ from when it is queued until it finishes or is cancelled.
 
 - A typed chain gets the player's current permission each time it wakes: a waiting chain can't keep operator
   powers after a de-op. Other sources keep their own permission, as `/schedule` and functions do.
+  A chain a player started as another entity (`execute as … run sh`, a function they ran) never wakes with more
+  permission than that player has then (added after review).
 - Each wake re-applies C1's rules (plain-value rule, escaping) and the msg/me/say refusal from that source.
 - Players see and cancel only their own jobs; another player's job answers like a missing one.
 - A player's jobs end when they leave, as does any job whose saved source is that player.
-- Jobs are bounded: length (`maxSleepTicks`), number (per player and total), work per wake (`maxTotalCommands`),
+- Jobs are bounded: length (`maxSleepTicks`), number (per player and total), work per second (`maxTotalCommands`),
   and nesting (`maxDepth`, across pauses).
 
 ## 8. Minecraft side and client

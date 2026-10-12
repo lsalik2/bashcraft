@@ -71,6 +71,18 @@ public class BashcraftTimeCheck implements FabricClientGameTest {
             check(stone(server, 8), "a player's chain resumes as that player");
             check(stone(server, 7), "a player can't cancel another's job");
 
+            // A player's waiting chains share one command budget per second: a timer that runs too much ends.
+            context.runOnClient(client -> client.getConnection().sendCommand(
+                    "sh alias e10 = 'echo x ; echo x ; echo x ; echo x ; echo x ; echo x ; echo x ; echo x ; echo x ; echo x'"));
+            context.runOnClient(client -> client.getConnection().sendCommand("sh alias spin = 'sleep 1 ; e10 ; e10 ; e10 ; e10 ; e10 ; spin'"));
+            context.runOnClient(client -> client.getConnection().sendCommand("sh spin"));
+            context.waitTicks(3);
+            server.runCommand("sh jobs | grep spin && setblock 17 120 20 minecraft:stone");
+            check(stone(server, 17), "a player's timer waits as a job");
+            context.waitTicks(40);
+            server.runCommand("sh jobs | grep spin && setblock 18 120 20 minecraft:stone");
+            check(!stone(server, 18), "a player's waiting chains share a command budget per second");
+
             // An operator's waiting chain has their permission only while they keep it.
             // So does one they start as another entity (execute as … run sh), which wakes as that entity.
             server.runCommand("summon minecraft:armor_stand 0 121 22 {Tags:[\"keeper\"],NoGravity:1b}");

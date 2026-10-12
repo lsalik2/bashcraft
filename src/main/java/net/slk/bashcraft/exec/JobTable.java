@@ -2,7 +2,9 @@ package net.slk.bashcraft.exec;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -37,6 +39,8 @@ public final class JobTable<T> {
     }
 
     private final TreeMap<Integer, Job<T>> jobs = new TreeMap<>();
+    /** Commands each player's jobs have run in the current second of the clock. */
+    private final Map<String, Integer> budgets = new HashMap<>();
     private final int maxJobs;
     private final int maxPerOwner;
     private final int maxDelay;
@@ -65,9 +69,27 @@ public final class JobTable<T> {
         return number;
     }
 
-    /** Advances the clock by one tick. */
+    /** Advances the clock by one tick; every 20 ticks starts a new second for the players' budgets. */
     public void tick() {
         now++;
+        if (now % 20 == 0) {
+            budgets.clear();
+        }
+    }
+
+    /**
+     * Commands {@code owner}'s jobs have run so far this second: a player's waiting chains share one budget per second
+     * (spec C3 §6). Always 0 for the server (null), whose jobs get a fresh budget each wake.
+     */
+    public int budgetSpent(String owner) {
+        return owner == null ? 0 : budgets.getOrDefault(owner, 0);
+    }
+
+    /** Records how many commands {@code owner}'s jobs have run so far this second. */
+    public void setBudgetSpent(String owner, int commands) {
+        if (owner != null) {
+            budgets.put(owner, commands);
+        }
     }
 
     /** The next job due now (by wake tick, then number), marked running; empty when none is left this tick. */

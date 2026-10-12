@@ -31,4 +31,20 @@ class DepthGuardTest {
         assertTrue(DepthGuard.enter(1).isEmpty());
         next.close();
     }
+
+    @Test
+    void theOutermostChainCanCarryOnABudgetAlreadySpent() {
+        try (DepthGuard.Scope outer = DepthGuard.enter(4, 254).orElseThrow()) {
+            assertEquals(254, DepthGuard.spent());
+            assertTrue(DepthGuard.spend(256));
+            try (DepthGuard.Scope inner = DepthGuard.enter(4, 0).orElseThrow()) {
+                assertEquals(255, DepthGuard.spent(), "only the outermost chain takes a budget already spent");
+                assertTrue(DepthGuard.spend(256));
+            }
+            assertFalse(DepthGuard.spend(256), "the carried budget runs out");
+        }
+        try (DepthGuard.Scope fresh = DepthGuard.enter(4).orElseThrow()) {
+            assertEquals(0, DepthGuard.spent(), "the count resets when the outermost chain ends");
+        }
+    }
 }

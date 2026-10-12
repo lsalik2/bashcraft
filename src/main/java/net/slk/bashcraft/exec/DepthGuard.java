@@ -27,6 +27,25 @@ public final class DepthGuard {
     }
 
     /**
+     * Enters one more level; when it is the outermost, the budget starts with {@code spent} commands already counted
+     * (a player's waiting chains that ran earlier this second).
+     */
+    public static Optional<Scope> enter(int maxDepth, int spent) {
+        State state = STATE.get();
+        boolean outermost = state.depth == 0;
+        Optional<Scope> scope = enter(maxDepth);
+        if (scope.isPresent() && outermost) {
+            state.spent = spent;
+        }
+        return scope;
+    }
+
+    /** Commands counted so far under the outermost chain. */
+    public static int spent() {
+        return STATE.get().spent;
+    }
+
+    /**
      * Counts one command toward the budget shared by every chain under the outermost one; false once {@code max}
      * commands have run. Outside any chain there is no budget. The count resets when the outermost chain ends.
      */

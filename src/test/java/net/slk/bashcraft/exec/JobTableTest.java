@@ -109,4 +109,20 @@ class JobTableTest {
         table.cancelOwner("p");
         assertEquals(List.of("%2  5t  Server: b"), table.listing(null, true));
     }
+
+    @Test
+    void aPlayersJobsShareABudgetPerSecond() {
+        JobTable<String> table = new JobTable<>(64, 8, 1000);
+        table.setBudgetSpent("p", 200);
+        table.setBudgetSpent(null, 200);
+        assertEquals(200, table.budgetSpent("p"));
+        assertEquals(0, table.budgetSpent("q"));
+        assertEquals(0, table.budgetSpent(null), "the server's jobs get a fresh budget each wake");
+        for (int i = 0; i < 19; i++) {
+            table.tick();
+        }
+        assertEquals(200, table.budgetSpent("p"), "the same second");
+        table.tick();
+        assertEquals(0, table.budgetSpent("p"), "a new second");
+    }
 }

@@ -139,6 +139,8 @@ like the other operators. `sleep` can't be used inside a pipe, `$( … )` or `ea
 stops the chain there.
 
 `jobs` lists your waiting chains (operators see everyone's) and `kill %N` cancels one (any other `kill` is vanilla's).
+Your waiting chains together run at most `maxTotalCommands` commands a second; a timer that runs more ends with an
+error.
 A chain you typed carries on as you are when it wakes — where you stand and the permissions you have then — and ends
 if you leave. Other chains (command blocks, functions, the console, `execute as … run sh`) carry on as they started,
 but never with more permission than the player who started them has by then. Waiting chains follow `/tick freeze`
