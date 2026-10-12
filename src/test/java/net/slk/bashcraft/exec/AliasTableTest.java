@@ -39,6 +39,7 @@ class AliasTableTest {
         assertEquals("alias name echo is already a command", assertThrows(ExpansionException.class, () -> table.define(false, "echo", "say")).getMessage());
         assertEquals("alias name sh is already a command", assertThrows(ExpansionException.class, () -> table.define(true, "sh", "say")).getMessage());
         assertEquals("alias name sleep is already a command", assertThrows(ExpansionException.class, () -> table.define(false, "sleep", "say")).getMessage());
+        assertEquals("alias name jobs is already a command", assertThrows(ExpansionException.class, () -> table.define(false, "jobs", "say")).getMessage());
     }
 
     @Test

@@ -414,6 +414,8 @@ public final class ChainExecutor {
                 case ALIAS -> alias(command, text, options);
                 case UNALIAS -> unalias(command, text);
                 case HISTORY -> history(command, options);
+                case JOBS -> jobs(command, text, options);
+                case KILL -> kill(command, text);
                 case EACH, SLEEP -> throw new IllegalStateException(call.kind() + " is handled above");
             };
             return finish(result, command);
@@ -774,6 +776,38 @@ public final class ChainExecutor {
             List<String> lines = context.history().lines();
             lines.forEach(line -> runner.echo(line, options));
             return new ExecResult(true, false, lines.size(), List.of(), new PipeValue.Items(lines));
+        }
+
+        /** jobs: one line per waiting chain this source may see, pipeable (spec C3 §4). */
+        private ExecResult jobs(Node.Command command, String arguments, RunOptions options) {
+            if (!arguments.isBlank()) {
+                runner.reportError(label(command) + "jobs takes no arguments");
+                return ExecResult.failure();
+            }
+            List<String> lines = context.jobs().listing();
+            lines.forEach(line -> runner.echo(line, options));
+            return new ExecResult(true, false, lines.size(), List.of(), new PipeValue.Items(lines));
+        }
+
+        /** kill %N…: cancels waiting chains; succeeds when every named one was cancelled, result = how many were. */
+        private ExecResult kill(Node.Command command, String arguments) {
+            int killed = 0;
+            int failed = 0;
+            for (String word : arguments.strip().split("\\s+")) {
+                if (!word.matches("%\\d{1,9}")) {
+                    runner.reportError(label(command) + "kill needs %N, e.g. kill %1");
+                    failed++;
+                    continue;
+                }
+                try {
+                    context.jobs().kill(Integer.parseInt(word.substring(1)));
+                    killed++;
+                } catch (ExpansionException e) {
+                    runner.reportError(label(command) + e.getMessage());
+                    failed++;
+                }
+            }
+            return new ExecResult(failed == 0, failed > 0, killed, List.of());
         }
 
         private String label(Node.Command command) {

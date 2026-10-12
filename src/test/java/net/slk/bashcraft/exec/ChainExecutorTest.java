@@ -921,4 +921,29 @@ class ChainExecutorTest {
         timed(r, jobs, 8).resume(jobs.queued.getFirst().continuation());
         assertEquals(List.of("fail", "say 0"), r.ran, "the chain going on doesn't change the waiting part's $?");
     }
+
+    @Test
+    void jobsListsWaitingChains() throws Exception {
+        FakeRunner r = new FakeRunner();
+        FakeJobs jobs = new FakeJobs();
+        jobs.lines.addAll(List.of("%1  40t  echo hi ; sleep 40 ; echo bye", "%2  5t  sleep 5"));
+        ExecResult listed = start(r, jobs, "jobs");
+        assertEquals(jobs.lines, r.echoed);
+        assertEquals(2, listed.result());
+        assertTrue(start(new FakeRunner(), jobs, "jobs | grep sleep 5").success(), "pipeable");
+        FakeRunner bad = new FakeRunner();
+        start(bad, jobs, "jobs now");
+        assertEquals(List.of("jobs takes no arguments"), bad.errors);
+    }
+
+    @Test
+    void killCancelsJobsByNumber() throws Exception {
+        FakeRunner r = new FakeRunner();
+        FakeJobs jobs = new FakeJobs();
+        jobs.live.addAll(List.of(1, 2));
+        start(r, jobs, "kill %1 %7 && say no ; kill %2 ; kill 2 ; kill %x");
+        assertEquals(List.of("[1] no job %7", "[5] kill needs %N, e.g. kill %1"), r.errors);
+        assertEquals(List.of("kill 2"), r.ran, "kill without % is vanilla's");
+        assertTrue(jobs.live.isEmpty());
+    }
 }

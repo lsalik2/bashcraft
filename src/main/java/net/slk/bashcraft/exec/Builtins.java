@@ -6,12 +6,13 @@ import java.util.regex.Pattern;
 
 /** Shell builtins recognised inside chains (spec C1 §4), on the command's text before expansion. */
 public final class Builtins {
-    public enum Kind { ASSIGN, UNSET, ECHO, GREP, STORE, EACH, SURFACE, ALIAS, UNALIAS, HISTORY, SLEEP, NONE }
+    public enum Kind { ASSIGN, UNSET, ECHO, GREP, STORE, EACH, SURFACE, ALIAS, UNALIAS, HISTORY, SLEEP, JOBS, KILL, NONE }
 
-    /** For ASSIGN: name and raw value; UNSET: name; ECHO, GREP, STORE, EACH, SURFACE, SLEEP: the text after the word; NONE: the whole command. */
+    /** For ASSIGN: name and raw value; UNSET: name; ECHO, GREP, STORE, EACH, SURFACE, SLEEP, JOBS: the text after the word; KILL: the arguments from the first %; NONE: the whole command. */
     public record Call(Kind kind, String name, String argument) {}
 
     private static final Pattern ASSIGN = Pattern.compile("((?:my\\.|global\\.)?[A-Za-z_][A-Za-z0-9_]*)=(.*)", Pattern.DOTALL);
+    private static final Pattern KILL = Pattern.compile("kill\\s+(%.*)", Pattern.DOTALL);
 
     private Builtins() {}
 
@@ -26,11 +27,16 @@ public final class Builtins {
         if (command.equals("echo") || command.startsWith("echo ")) {
             return new Call(Kind.ECHO, "", command.length() > 5 ? command.substring(5) : "");
         }
-        for (Kind kind : List.of(Kind.GREP, Kind.STORE, Kind.EACH, Kind.SURFACE, Kind.ALIAS, Kind.UNALIAS, Kind.HISTORY, Kind.SLEEP)) {
+        for (Kind kind : List.of(Kind.GREP, Kind.STORE, Kind.EACH, Kind.SURFACE, Kind.ALIAS, Kind.UNALIAS, Kind.HISTORY, Kind.SLEEP, Kind.JOBS)) {
             String word = kind.name().toLowerCase(java.util.Locale.ROOT);
             if (command.equals(word) || command.startsWith(word + " ")) {
                 return new Call(kind, "", command.length() > word.length() + 1 ? command.substring(word.length() + 1) : "");
             }
+        }
+        // Only kill %N is BashCraft's: any other kill is vanilla's.
+        Matcher kill = KILL.matcher(command);
+        if (kill.matches()) {
+            return new Call(Kind.KILL, "", kill.group(1));
         }
         return new Call(Kind.NONE, "", command);
     }

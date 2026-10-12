@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public final class AliasTable implements Aliases {
     public static final int MAX_ALIASES = 64;
     public static final int MAX_BODY = 1024;
-    public static final Set<String> BUILTIN_WORDS = Set.of("alias", "unalias", "echo", "unset", "grep", "store", "each", "surface", "history", "sh", "sleep");
+    public static final Set<String> BUILTIN_WORDS = Set.of("alias", "unalias", "echo", "unset", "grep", "store", "each", "surface", "history", "sh", "sleep", "jobs");
     public static final int MAX_CALLABLE = 128;
     private static final Pattern NAME = Pattern.compile("[a-z_][a-z0-9_-]{0,31}");
 

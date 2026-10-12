@@ -51,4 +51,13 @@ class BuiltinsTest {
         assertEquals(new Builtins.Call(Builtins.Kind.SLEEP, "", "20"), Builtins.classify("sleep 20"));
         assertEquals(Builtins.Kind.NONE, Builtins.classify("sleepy 20").kind());
     }
+
+    @Test
+    void killIsBuiltinOnlyWithPercent() {
+        assertEquals(new Builtins.Call(Builtins.Kind.KILL, "", "%1 %2"), Builtins.classify("kill %1 %2"));
+        assertEquals(new Builtins.Call(Builtins.Kind.JOBS, "", ""), Builtins.classify("jobs"));
+        assertEquals(Builtins.Kind.NONE, Builtins.classify("kill @e[type=zombie]").kind());
+        assertEquals(Builtins.Kind.NONE, Builtins.classify("kill").kind());
+        assertEquals(Builtins.Kind.NONE, Builtins.classify("kill 2").kind());
+    }
 }

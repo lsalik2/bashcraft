@@ -32,4 +32,19 @@ final class FakeJobs implements Jobs {
             throw new ExpansionException("sleep is limited to " + maxDelay + " ticks");
         }
     }
+
+    final List<String> lines = new ArrayList<>();
+    final java.util.Set<Integer> live = new java.util.TreeSet<>();
+
+    @Override
+    public List<String> listing() {
+        return lines;
+    }
+
+    @Override
+    public void kill(int number) throws ExpansionException {
+        if (!live.remove(number)) {
+            throw new ExpansionException("no job %" + number);
+        }
+    }
 }
