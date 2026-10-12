@@ -27,7 +27,7 @@ or text, and append them to the next command — or put them where you write `{x
 `{result}` is the previous command's numeric result. Zero and negative values pipe like any other. `/locate` reports Y as `~`, so `| tp @s` keeps your height;
 use `tp @s {x} 120 {z}` to choose one.
 
-**Quoting:** `"…"` and `'…'` are never split; `\&&`, `\|`, `\;`, `\(`, `\)` are literal; `\{x}` is a literal `{x}`.
+**Quoting:** `"…"` and `'…'` are never split; `\&`, `\&&`, `\|`, `\;`, `\(`, `\)` are literal; `\{x}` is a literal `{x}`.
 A quote right after a letter or digit doesn't start a quoted span, so `don't` is plain text.
 
 Works in chat, the console, command blocks and functions (write `sh …` in `.mcfunction` files).
@@ -105,6 +105,44 @@ and `store storage ID PATH` run the matching vanilla command as you, so they nee
 It loads that chunk (generating it if needed), so it needs operator permission, like `/locate`, never reaches beyond
 the world border, and isn't available in dimensions with a ceiling such as the Nether. `echo 100 ~ -20 | surface` works too.
 
+**Aliases and history:**
+
+```
+/sh alias home = tp @s 0 80 0
+/sh alias heal = 'effect give $1 minecraft:regeneration 5 ${2:-1} && say healed $1'
+/sh home && heal @s 3
+/sh !!          /sh !tp          /sh history | grep locate
+```
+
+An alias is a named chain (quote it to include `&&`, `;`, `|`). `$1`…`$9`, `$@` (all), `$#` (count) and
+`${N:-default}` are its arguments; with none of those, arguments are appended to its last command. `alias` lists
+aliases, `unalias NAME` removes one. Your aliases only run in chains you type; operators can define
+`alias global.NAME = …`, which works everywhere (functions, command blocks). Alias names can't be existing commands.
+`/sh !!` reruns your last line and `/sh !PREFIX` the last one starting with PREFIX; `history` lists this session's
+lines (kept until you leave).
+
+**Time:** `sleep` pauses a chain, and `&` lets part of one wait on its own.
+
+```
+/sh echo 3 ; sleep 20 ; echo 2 ; sleep 20 ; echo 1 ; sleep 20 ; title @s title "go"
+/sh (sleep 1200 ; title @s title "time's up") & echo timer started
+/sh alias tick = 'effect give @s minecraft:speed 2 ; sleep 2s ; tick'
+/sh jobs          /sh kill %1
+```
+
+`sleep TIME` takes `/schedule`'s units: ticks by default, or `20t`, `1s`, `0.5s`, `1d` (at least 1 tick, at most an
+hour by default). The server never waits: `/sh` returns at once (reporting the `sleep`), a function goes on to its
+next line, and the rest of the chain runs on a later tick. `X & Y` runs `X`, and if `X` sleeps, the rest of `X` waits
+on its own while `Y` runs at once; as in bash, `&` takes the whole `&&`/`||` list before it. In `/sh` a lone `&` is
+an operator, so write `\&` for a literal one (`\&&` is still a literal `&&`); without `/sh`, `&` needs a `/` after it
+like the other operators. `sleep` can't be used inside a pipe, `$( … )` or `each`, and a `sleep` that can't wait
+stops the chain there.
+
+`jobs` lists your waiting chains (operators see everyone's) and `kill %N` cancels one (any other `kill` is vanilla's).
+A chain you typed carries on as you are when it wakes — where you stand and the permissions you have then — and ends
+if you leave. Other chains (command blocks, functions, the console) carry on as they started. Waiting chains follow
+`/tick freeze` and `/tick rate` like `/schedule`, and are not kept across restarts.
+
 ### Without `/sh`
 
 Chains also work typed directly, as long as every command after an operator starts with `/`:
@@ -135,7 +173,8 @@ also inside `/sh …` lines and in command blocks. On servers without BashCraft 
 
 `config/bashcraft.json`: `maxSegments` (32), `maxDepth` (8), `maxTotalCommands` (256, across nested chains),
 `swallowPipedOutput` (true),
-`transparentMode` (true).
+`transparentMode` (true), `maxSleepTicks` (72000, one hour), `maxJobsPerPlayer` (8), `maxJobs` (64, waiting chains
+on the whole server).
 
 ## Building
 

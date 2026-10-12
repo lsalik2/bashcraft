@@ -20,6 +20,7 @@ import net.slk.bashcraft.exec.ExecResult;
 import net.slk.bashcraft.exec.ShellContext;
 import net.slk.bashcraft.mc.HistoryBook;
 import net.slk.bashcraft.mc.MinecraftCommandRunner;
+import net.slk.bashcraft.mc.ServerJobs;
 import net.slk.bashcraft.mc.Sources;
 import net.slk.bashcraft.mc.StorageAliases;
 import net.slk.bashcraft.mc.StorageVariables;
@@ -91,7 +92,7 @@ public final class ShCommand {
         }
         try (DepthGuard.Scope ignored = scope.get()) {
             ShellContext shell = new ShellContext(StorageVariables.of(source), StorageAliases.of(source),
-                    Sources.typist(source).map(HistoryBook::of).orElse(null));
+                    Sources.typist(source).map(HistoryBook::of).orElse(null), ServerJobs.forSource(source));
             return new ChainExecutor(new MinecraftCommandRunner(source), shell,
                     config.swallowPipedOutput, config.maxTotalCommands, config.maxDepth).execute(chain);
         }

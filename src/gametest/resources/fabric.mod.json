@@ -15,7 +15,8 @@
 			"net.slk.bashcraft.test.BashcraftVariableCheck",
 			"net.slk.bashcraft.test.BashcraftPlumbingCheck",
 			"net.slk.bashcraft.test.BashcraftSurfaceCheck",
-			"net.slk.bashcraft.test.BashcraftAliasCheck"
+			"net.slk.bashcraft.test.BashcraftAliasCheck",
+			"net.slk.bashcraft.test.BashcraftTimeCheck"
 		]
 	},
 	"depends": {

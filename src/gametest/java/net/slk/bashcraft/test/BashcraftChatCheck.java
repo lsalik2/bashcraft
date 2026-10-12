@@ -68,6 +68,10 @@ public class BashcraftChatCheck implements FabricClientGameTest {
             context.runOnClient(client -> ChatProbe.open(client, "/sh hb && hb"));
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "alias calls are not shown as errors");
+            context.runOnClient(client -> ChatProbe.open(client, "/sh echo a ; sleep 1s & jobs ; kill %1"));
+            context.waitTicks(2);
+            check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)),
+                    "sleep, &, jobs and kill %N are not shown as errors");
             context.runOnClient(client -> ChatProbe.open(client, "/tp @s ~ ~ ~"));
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "a vanilla line is unchanged");
