@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -749,5 +750,175 @@ class ChainExecutorTest {
         ExecResult result = run(r, "a & b && c ; a &");
         assertEquals(List.of("a", "b", "c", "a"), r.ran);
         assertTrue(result.success(), "the status after & is success");
+    }
+
+    private static ChainExecutor timed(FakeRunner runner, FakeJobs jobs, int maxDepth) {
+        return timed(runner, jobs, aliases(), maxDepth);
+    }
+
+    /** Every wake builds a new context; aliases kept in one table stay defined across wakes, as in storage. */
+    private static ChainExecutor timed(FakeRunner runner, FakeJobs jobs, AliasTable aliases, int maxDepth) {
+        return new ChainExecutor(runner, new ShellContext(table(), aliases, null, jobs), true, Integer.MAX_VALUE, maxDepth);
+    }
+
+    private static ExecResult start(FakeRunner runner, FakeJobs jobs, String chain) throws Exception {
+        return timed(runner, jobs, 8).execute(NodeParser.parse(chain, NodeParser.Mode.SH, 32));
+    }
+
+    @Test
+    void pauseAndResumeThroughListsAndGroups() throws Exception {
+        FakeRunner r = new FakeRunner().on("b", FAIL);
+        FakeJobs jobs = new FakeJobs();
+        ExecResult result = start(r, jobs, "a ; (sleep 20 ; b) || c ; d");
+        assertEquals(List.of("a"), r.ran);
+        assertTrue(result.success());
+        assertEquals(20, result.result(), "/sh reports the sleep");
+        assertEquals(List.of(new FakeJobs.Queued(jobs.queued.getFirst().continuation(), 20, "a ; (sleep 20 ; b) || c ; d")), jobs.queued);
+        timed(r, jobs, 8).resume(jobs.queued.getFirst().continuation());
+        assertEquals(List.of("a", "b", "c", "d"), r.ran);
+        assertTrue(jobs.requeued.isEmpty());
+
+        FakeJobs timer = new FakeJobs();
+        start(new FakeRunner(), timer, "d=7 ; sleep $d ; a");
+        assertEquals(7, timer.queued.getFirst().delay());
+    }
+
+    @Test
+    void statusAndArgumentsSurviveAPause() throws Exception {
+        FakeRunner r = new FakeRunner().on("fail", FAIL);
+        FakeJobs jobs = new FakeJobs();
+        start(r, jobs, "alias t = 'sleep 5 ; say $1 ; fail' ; t x || say $? && say after");
+        assertTrue(r.ran.isEmpty());
+        timed(r, jobs, 8).resume(jobs.queued.getFirst().continuation());
+        assertEquals(List.of("say x", "fail", "say 1", "say after"), r.ran);
+    }
+
+    @Test
+    void aliasTimerKeepsOneFrame() throws Exception {
+        FakeRunner r = new FakeRunner();
+        FakeJobs jobs = new FakeJobs();
+        AliasTable aliases = aliases();
+        timed(r, jobs, aliases, 8).execute(NodeParser.parse("alias tick = 'say hi ; sleep 20 ; tick' ; tick", NodeParser.Mode.SH, 32));
+        Continuation waiting = jobs.queued.getFirst().continuation();
+        for (int round = 0; round < 20; round++) {
+            jobs.requeued.clear();
+            timed(r, jobs, aliases, 8).resume(waiting);
+            waiting = jobs.requeued.getFirst().continuation();
+            assertEquals(1, waiting.depth(), "round " + round);
+        }
+        assertEquals(21, r.ran.size());
+        assertTrue(r.errors.isEmpty(), r.errors.toString());
+    }
+
+    @Test
+    void depthCountsAcrossPauses() throws Exception {
+        FakeRunner r = new FakeRunner();
+        FakeJobs jobs = new FakeJobs();
+        AliasTable aliases = aliases();
+        timed(r, jobs, aliases, 8).execute(NodeParser.parse("alias t = 'say hi ; sleep 20 ; t ; say after' ; t", NodeParser.Mode.SH, 32));
+        Continuation waiting = jobs.queued.getFirst().continuation();
+        int rounds = 0;
+        while (r.errors.isEmpty() && rounds < 50) {
+            jobs.requeued.clear();
+            timed(r, jobs, aliases, 4).resume(waiting);
+            if (jobs.requeued.isEmpty()) {
+                break;
+            }
+            waiting = jobs.requeued.getFirst().continuation();
+            rounds++;
+        }
+        assertEquals("aliases nested deeper than 4", r.errors.getFirst());
+        assertTrue(rounds < 10, "stopped after a few rounds: " + rounds);
+    }
+
+    @Test
+    void everyWakeGetsAFreshBudget() throws Exception {
+        FakeRunner r = new FakeRunner();
+        FakeJobs jobs = new FakeJobs();
+        ChainExecutor small = new ChainExecutor(r, new ShellContext(table(), aliases(), null, jobs), true, 3, 8);
+        try (DepthGuard.Scope ignored = DepthGuard.enter(8).orElseThrow()) {
+            small.execute(NodeParser.parse("a ; b ; sleep 1 ; c ; d ; sleep 1 ; e", NodeParser.Mode.SH, 32));
+        }
+        assertEquals(List.of("a", "b"), r.ran);
+        try (DepthGuard.Scope ignored = DepthGuard.enter(8).orElseThrow()) {
+            small.resume(jobs.queued.getFirst().continuation());
+        }
+        assertEquals(List.of("a", "b", "c", "d"), r.ran);
+        try (DepthGuard.Scope ignored = DepthGuard.enter(8).orElseThrow()) {
+            small.resume(jobs.requeued.getFirst().continuation());
+        }
+        assertEquals(List.of("a", "b", "c", "d", "e"), r.ran);
+        assertTrue(r.errors.isEmpty(), r.errors.toString());
+    }
+
+    @Test
+    void refusedSleepsStopTheChain() throws Exception {
+        Map<String, String> cases = new LinkedHashMap<>();
+        cases.put("echo 5 | sleep 20 ; a || b", "[2] sleep can't run inside a pipe");
+        cases.put("say $(sleep 20) ; a || b", "sleep can't run inside $(…)");
+        cases.put("echo x | each sleep 20 ; a || b", "[2] sleep can't run inside each");
+        cases.put("sleep 0 ; a || b", "[1] sleep needs at least 1 tick");
+        cases.put("(sleep soon || a) ; a || b", "[1] sleep needs a time like 20, 20t, 1s or 1d");
+        cases.put("(sleep 0 ; a) & a || b", "[1] sleep needs at least 1 tick");
+        cases.put("alias z = 'sleep 2 ; a' ; z | grep x ; a || b", "sleep can't run inside a pipe");
+        for (Map.Entry<String, String> c : cases.entrySet()) {
+            FakeRunner r = new FakeRunner();
+            FakeJobs jobs = new FakeJobs();
+            ExecResult result = start(r, jobs, c.getKey());
+            assertEquals(List.of(c.getValue()), r.errors, c.getKey());
+            assertEquals(List.of(), r.ran, c.getKey());
+            assertFalse(result.success(), c.getKey());
+            assertTrue(jobs.queued.isEmpty(), c.getKey());
+        }
+    }
+
+    @Test
+    void aSleepTheJobsRefuseStopsTheChain() throws Exception {
+        FakeRunner r = new FakeRunner();
+        FakeJobs full = new FakeJobs();
+        full.full = true;
+        assertFalse(start(r, full, "a ; sleep 20 ; b").success());
+        start(r, full, "(sleep 5 ; c) & d");
+        assertEquals(List.of("[2] too many waiting chains (max 1)", "[1] too many waiting chains (max 1)"), r.errors);
+        assertEquals(List.of("a"), r.ran);
+
+        FakeRunner limited = new FakeRunner();
+        FakeJobs jobs = new FakeJobs();
+        jobs.maxDelay = 100;
+        start(limited, jobs, "sleep 101 ; b");
+        assertEquals(List.of("[1] sleep is limited to 100 ticks"), limited.errors);
+        assertTrue(limited.ran.isEmpty());
+    }
+
+    @Test
+    void backgroundDetachesItsWaitingPart() throws Exception {
+        FakeRunner r = new FakeRunner();
+        FakeJobs jobs = new FakeJobs();
+        ExecResult result = start(r, jobs, "(sleep 10 ; a) & (sleep 20 ; b) & c ; sleep 5 ; d");
+        assertEquals(List.of("c"), r.ran);
+        assertEquals(List.of("(sleep 10 ; a)", "(sleep 20 ; b)", "(sleep 10 ; a) & (sleep 20 ; b) & c ; sleep 5 ; d"),
+                jobs.queued.stream().map(FakeJobs.Queued::text).toList());
+        assertEquals(List.of(10, 20, 5), jobs.queued.stream().map(FakeJobs.Queued::delay).toList());
+        assertEquals(5, result.result());
+        for (FakeJobs.Queued queued : List.copyOf(jobs.queued)) {
+            timed(r, jobs, 8).resume(queued.continuation());
+        }
+        assertEquals(List.of("c", "a", "b", "d"), r.ran);
+
+        FakeRunner list = new FakeRunner();
+        FakeJobs listJobs = new FakeJobs();
+        start(list, listJobs, "a && sleep 5 && b & c");
+        assertEquals(List.of("a", "c"), list.ran);
+        assertEquals("a && sleep 5 && b", listJobs.queued.getFirst().text());
+    }
+
+    @Test
+    void aDetachedPartKeepsItsOwnStatus() throws Exception {
+        FakeRunner r = new FakeRunner().on("fail", FAIL);
+        FakeJobs jobs = new FakeJobs();
+        start(r, jobs, "(sleep 5 ; say $?) & fail");
+        assertEquals(List.of("fail"), r.ran);
+        timed(r, jobs, 8).resume(jobs.queued.getFirst().continuation());
+        assertEquals(List.of("fail", "say 0"), r.ran, "the chain going on doesn't change the waiting part's $?");
     }
 }

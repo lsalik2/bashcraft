@@ -1,5 +1,6 @@
 package net.slk.bashcraft.exec;
 
+import net.slk.bashcraft.chain.ChainFormatter;
 import net.slk.bashcraft.chain.ChainSyntaxException;
 import net.slk.bashcraft.chain.Node;
 import net.slk.bashcraft.chain.NodeParser;
@@ -7,6 +8,9 @@ import net.slk.bashcraft.pipe.PipeException;
 import net.slk.bashcraft.pipe.PipeResolver;
 import net.slk.bashcraft.pipe.PipeValue;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,13 +62,6 @@ public final class ChainExecutor {
         this.maxDepth = maxDepth;
     }
 
-    /** Returns the outcome of the last command that ran (a skipped item leaves the status unchanged). */
-    public ExecResult execute(Node root) {
-        Map<Node.Command, Integer> numbers = new IdentityHashMap<>();
-        number(root, numbers);
-        return new Run(numbers, root.commandCount() > 1).node(root, null, false).result();
-    }
-
     /** [n] numbers commands left to right as written, whether or not they run. */
     private static void number(Node node, Map<Node.Command, Integer> numbers) {
         switch (node) {
@@ -86,31 +83,171 @@ public final class ChainExecutor {
         };
     }
 
+    /**
+     * Returns the outcome of the last command that ran (a skipped item leaves the status unchanged). A chain that
+     * paused goes to {@link Jobs#queue} and reports the {@code sleep}.
+     */
+    public ExecResult execute(Node root) {
+        Map<Node.Command, Integer> numbers = new IdentityHashMap<>();
+        number(root, numbers);
+        Outcome outcome = new Run(new RunState(numbers, root.commandCount() > 1, null, 0), null).node(root, null, false);
+        Halt halt = outcome.halt();
+        if (halt != null && !halt.stopped()) {
+            try {
+                context.jobs().queue(new Continuation(halt.frames()), halt.delay(), ChainFormatter.toSh(root));
+            } catch (ExpansionException e) {
+                runner.reportError(halt.label() + e.getMessage());
+                return ExecResult.failure();
+            }
+        }
+        return outcome.result();
+    }
+
+    /**
+     * Runs a paused chain on (spec C3 §5): its frames innermost first, each one's outcome deciding the {@code &&} /
+     * {@code ||} of the frame outside it. A new pause goes back to the same job through {@link Jobs#requeue}.
+     */
+    public void resume(Continuation continuation) {
+        List<Frame> frames = continuation.frames;
+        // Only alias levels with frames left count, renumbered from 0: a timer that calls itself last stays one level deep.
+        List<Integer> levels = frames.stream().map(frame -> frame.state().level).distinct().sorted().toList();
+        Map<RunState, RunState> renumbered = new IdentityHashMap<>();
+        for (Frame frame : frames) {
+            renumbered.computeIfAbsent(frame.state(), state -> state.atLevel(levels.indexOf(state.level)));
+        }
+        Map<RunState, Run> runs = new IdentityHashMap<>();
+        Deque<DepthGuard.Scope> scopes = new ArrayDeque<>();
+        try {
+            Outcome outcome = null;
+            RunState previous = null;
+            for (int f = 0; f < frames.size(); f++) {
+                Frame frame = frames.get(f);
+                RunState state = renumbered.get(frame.state());
+                while (scopes.size() > state.level) {
+                    scopes.pop().close();
+                }
+                while (scopes.size() < state.level) {
+                    Optional<DepthGuard.Scope> scope = DepthGuard.enter(maxDepth);
+                    if (scope.isEmpty()) {
+                        runner.reportError("aliases nested deeper than " + maxDepth);
+                        return;
+                    }
+                    scopes.push(scope.get());
+                }
+                if (outcome == null) {
+                    outcome = new Outcome(frame.status(), frame.lastCommand());
+                } else if (state != previous) {
+                    // The alias call this frame waited on has finished: like any command, it sets $?.
+                    state.lastStatus = outcome.result().success() ? 0 : 1;
+                }
+                previous = state;
+                outcome = runs.computeIfAbsent(state, s -> new Run(s, null)).continueSequence(frame.sequence(), frame.next(), outcome, false);
+                Halt halt = outcome.halt();
+                if (halt != null) {
+                    if (!halt.stopped()) {
+                        List<Frame> rest = new ArrayList<>(halt.frames());
+                        frames.subList(f + 1, frames.size()).forEach(outer -> rest.add(outer.withState(renumbered.get(outer.state()))));
+                        try {
+                            context.jobs().requeue(new Continuation(rest), halt.delay());
+                        } catch (ExpansionException e) {
+                            runner.reportError(halt.label() + e.getMessage());
+                        }
+                    }
+                    return;
+                }
+            }
+        } finally {
+            while (!scopes.isEmpty()) {
+                scopes.pop().close();
+            }
+        }
+    }
+
+    /** The frames with their run states copied, so the chain going on can't change a waiting part's $?. */
+    private static List<Frame> detached(List<Frame> frames) {
+        Map<RunState, RunState> copies = new IdentityHashMap<>();
+        return frames.stream().map(frame -> frame.withState(copies.computeIfAbsent(frame.state(), state -> state.atLevel(state.level)))).toList();
+    }
+
+    /** A list a paused chain was inside: run its items from {@code next} on, after {@code status}. */
+    record Frame(Node.Sequence sequence, int next, ExecResult status, String lastCommand, RunState state) {
+        Frame withState(RunState other) {
+            return new Frame(sequence, next, status, lastCommand, other);
+        }
+    }
+
+    /**
+     * One run's settings and {@code $?}, shared by the frames it leaves: command numbers, whether errors are numbered,
+     * the alias arguments in force ({@code null} outside an alias) and how many alias levels deep it is.
+     */
+    static final class RunState {
+        final Map<Node.Command, Integer> numbers;
+        final boolean numbered;
+        final Arguments positionals;
+        final int level;
+        int lastStatus;
+
+        RunState(Map<Node.Command, Integer> numbers, boolean numbered, Arguments positionals, int level) {
+            this.numbers = numbers;
+            this.numbered = numbered;
+            this.positionals = positionals;
+            this.level = level;
+        }
+
+        RunState atLevel(int other) {
+            RunState copy = new RunState(numbers, numbered, positionals, other);
+            copy.lastStatus = lastStatus;
+            return copy;
+        }
+    }
+
+    /**
+     * Why a run ended early: paused by {@code sleep} for {@code delay} ticks — the lists still to finish are collected
+     * in {@code frames} on the way up, innermost first — or stopped for good by a sleep that couldn't pause (already
+     * reported). {@code label} is the sleep's {@code [n] }, for an error from the job queue.
+     */
+    private record Halt(boolean stopped, int delay, String label, List<Frame> frames) {
+        static Halt pause(int delay, String label) {
+            return new Halt(false, delay, label, new ArrayList<>());
+        }
+
+        static Halt stop() {
+            return new Halt(true, 0, "", List.of());
+        }
+    }
+
+    /** Thrown out of a {@code $( … )} whose chain stopped, so the command around it stops the chain too, silently. */
+    private static final class ChainStopped extends ExpansionException {
+        ChainStopped() {
+            super("the chain stopped");
+        }
+    }
+
     /** A value piped into a node and the producing command's numeric result ({result}). */
     /** A value piped into a node, the producing command's numeric result ({result}), and the items grep/each work on. */
     private record Piped(PipeValue value, int result, List<String> items) {}
 
-    /** What running a node produced; lastCommand is the text of the last command that ran. */
-    private record Outcome(ExecResult result, String lastCommand) {}
+    /** What running a node produced; lastCommand is the text of the last command that ran; halt is set when it paused or stopped. */
+    private record Outcome(ExecResult result, String lastCommand, Halt halt) {
+        Outcome(ExecResult result, String lastCommand) {
+            this(result, lastCommand, null);
+        }
+
+        Outcome halted(Halt other) {
+            return new Outcome(result, lastCommand, other);
+        }
+    }
 
     private final class Run {
-        private final Map<Node.Command, Integer> numbers;
-        private final boolean numbered;
-        private int lastStatus;
+        private final RunState state;
+        /** Why a sleep can't pause here ("inside a pipe", …), or null where it can. */
+        private String noPause;
         private boolean budgetExceeded;
         private boolean expansionFailed;
 
-        private final Arguments positionals;
-
-        Run(Map<Node.Command, Integer> numbers, boolean numbered) {
-            this(numbers, numbered, null);
-        }
-
-        /** @param positionals the alias call's words while running an alias body, else null */
-        Run(Map<Node.Command, Integer> numbers, boolean numbered, Arguments positionals) {
-            this.numbers = numbers;
-            this.numbered = numbered;
-            this.positionals = positionals;
+        Run(RunState state, String noPause) {
+            this.state = state;
+            this.noPause = noPause;
         }
 
         Outcome node(Node node, Piped input, boolean feedsPipe) {
@@ -125,8 +262,24 @@ public final class ChainExecutor {
 
         /** A piped value goes to the first item only. Any item may run last, so all hide output when the result feeds a pipe. */
         private Outcome sequence(Node.Sequence sequence, Piped input, boolean feedsPipe) {
-            Outcome status = node(sequence.items().getFirst(), input, feedsPipe);
-            for (int i = 1; i < sequence.items().size(); i++) {
+            return continueSequence(sequence, 1, node(sequence.items().getFirst(), input, feedsPipe), feedsPipe);
+        }
+
+        /**
+         * Runs the items from {@code from} on, after {@code status} (the outcome of the item before). When an item
+         * pauses, a frame for the items still to run is added on the way up; when one stops, nothing more runs.
+         */
+        Outcome continueSequence(Node.Sequence sequence, int from, Outcome status, boolean feedsPipe) {
+            for (int i = from; ; i++) {
+                if (status.halt() != null) {
+                    if (!status.halt().stopped() && i < sequence.items().size()) {
+                        status.halt().frames().add(new Frame(sequence, i, status.result(), status.lastCommand(), state));
+                    }
+                    return status;
+                }
+                if (i == sequence.items().size()) {
+                    return status;
+                }
                 boolean run = switch (sequence.joins().get(i - 1)) {
                     case AND -> status.result().success();
                     case OR -> !status.result().success();
@@ -136,35 +289,67 @@ public final class ChainExecutor {
                     status = node(sequence.items().get(i), null, feedsPipe);
                 }
             }
-            return status;
         }
 
-        /** body &: the status after it is success, as in bash (spec C3 §3). */
+        /** sleep TIME: pauses the chain (spec C3 §2); a sleep that can't pause stops it. */
+        private Outcome sleep(Node.Command command, String text) {
+            int ticks;
+            try {
+                if (noPause != null) {
+                    throw new ExpansionException("sleep can't run " + noPause);
+                }
+                ticks = SleepTime.ticks(text);
+            } catch (ExpansionException e) {
+                runner.reportError(label(command) + e.getMessage());
+                return finish(ExecResult.failure(), command).halted(Halt.stop());
+            }
+            return finish(new ExecResult(true, false, ticks, List.of()), command).halted(Halt.pause(ticks, label(command)));
+        }
+
+        /** body &: if the body pauses, its waiting part becomes a job of its own and the chain carries on (spec C3 §3). */
         private Outcome background(Node.Background background, Piped input, boolean feedsPipe) {
             Outcome body = node(background.body(), input, feedsPipe);
-            lastStatus = 0;
+            Halt halt = body.halt();
+            if (halt != null && halt.stopped()) {
+                return body;
+            }
+            if (halt != null) {
+                try {
+                    context.jobs().queue(new Continuation(detached(halt.frames())), halt.delay(), ChainFormatter.toSh(background.body()));
+                } catch (ExpansionException e) {
+                    runner.reportError(halt.label() + e.getMessage());
+                    return new Outcome(ExecResult.failure(), body.lastCommand(), Halt.stop());
+                }
+            }
+            state.lastStatus = 0;
             return new Outcome(new ExecResult(true, 1, List.of()), body.lastCommand());
         }
 
         private Outcome pipeline(Node.Pipeline pipeline, Piped input, boolean feedsPipe) {
-            List<Node> stages = pipeline.stages();
-            Outcome previous = node(stages.getFirst(), input, true);
-            for (int i = 1; i < stages.size(); i++) {
-                // A result of 0 or less is still a value (a score, a coordinate, a distance); only an error stops the pipe.
-                if (previous.result().errored()) {
-                    return previous;
+            String outer = noPause;
+            noPause = "inside a pipe";
+            try {
+                List<Node> stages = pipeline.stages();
+                Outcome previous = node(stages.getFirst(), input, true);
+                for (int i = 1; i < stages.size(); i++) {
+                    // A result of 0 or less is still a value (a score, a coordinate, a distance); only an error stops the pipe.
+                    if (previous.halt() != null || previous.result().errored()) {
+                        return previous;
+                    }
+                    Node stage = stages.get(i);
+                    Piped piped;
+                    try {
+                        piped = piped(previous.result());
+                    } catch (PipeException e) {
+                        runner.reportError(label(firstCommand(stage)) + "nothing to pipe from /" + previous.lastCommand());
+                        return new Outcome(ExecResult.failure(), previous.lastCommand());
+                    }
+                    previous = node(stage, piped, i < stages.size() - 1 || feedsPipe);
                 }
-                Node stage = stages.get(i);
-                Piped piped;
-                try {
-                    piped = piped(previous.result());
-                } catch (PipeException e) {
-                    runner.reportError(label(firstCommand(stage)) + "nothing to pipe from /" + previous.lastCommand());
-                    return new Outcome(ExecResult.failure(), previous.lastCommand());
-                }
-                previous = node(stage, piped, i < stages.size() - 1 || feedsPipe);
+                return previous;
+            } finally {
+                noPause = outer;
             }
-            return previous;
         }
 
         private Outcome command(Node.Command command, Piped input, boolean feedsPipe) {
@@ -175,7 +360,8 @@ public final class ChainExecutor {
                 String word = command.text().split("\\s", 2)[0];
                 Optional<String> alias = context.aliases().body(word);
                 if (alias.isPresent()) {
-                    return finish(callAlias(command, word, alias.get(), input, feedsPipe), command);
+                    Outcome called = callAlias(command, word, alias.get(), input, feedsPipe);
+                    return finish(called.result(), command).halted(called.halt());
                 }
             }
             String text = call.argument();
@@ -184,11 +370,15 @@ public final class ChainExecutor {
                 try {
                     boolean takesPipe = call.kind() != Builtins.Kind.GREP && call.kind() != Builtins.Kind.STORE
                             && call.kind() != Builtins.Kind.SURFACE;
-                    Expander.Expansion expansion = Expander.expandParts(text, variables, lastStatus, this::substitute,
-                            input == null || !takesPipe ? null : new Expander.PipeInput(input.value(), input.result()), positionals);
+                    Expander.Expansion expansion = Expander.expandParts(text, variables, state.lastStatus, this::substitute,
+                            input == null || !takesPipe ? null : new Expander.PipeInput(input.value(), input.result()), state.positionals);
                     text = finalText(call, command.text(), expansion);
                 } catch (ExpansionException e) {
                     expansionFailed = true;
+                    if (e instanceof ChainStopped) {
+                        // A sleep refused inside $( … ) has said why; the chain stops here.
+                        return finish(ExecResult.failure(), command).halted(Halt.stop());
+                    }
                     runner.reportError(label(command) + e.getMessage());
                     return finish(ExecResult.failure(), command);
                 }
@@ -200,7 +390,7 @@ public final class ChainExecutor {
                     return finish(ExecResult.failure(), command);
                 }
                 if (call.kind() == Builtins.Kind.EACH) {
-                    return finish(each(command, text, input, feedsPipe), command);
+                    return each(command, text, input, feedsPipe);
                 }
             }
             if (!DepthGuard.spend(maxTotalCommands)) {
@@ -208,7 +398,10 @@ public final class ChainExecutor {
                 runner.reportError(label(command) + "too many commands across nested chains (max " + maxTotalCommands + ")");
                 return finish(ExecResult.failure(), command);
             }
-            String prefix = numbered ? label(command) : null;
+            if (call.kind() == Builtins.Kind.SLEEP) {
+                return sleep(command, text);
+            }
+            String prefix = state.numbered ? label(command) : null;
             RunOptions options = new RunOptions(feedsPipe && swallowPipedOutput, prefix);
             ExecResult result = switch (call.kind()) {
                 case NONE -> runner.run(text, options);
@@ -221,7 +414,7 @@ public final class ChainExecutor {
                 case ALIAS -> alias(command, text, options);
                 case UNALIAS -> unalias(command, text);
                 case HISTORY -> history(command, options);
-                case EACH -> throw new IllegalStateException("each is handled above");
+                case EACH, SLEEP -> throw new IllegalStateException(call.kind() + " is handled above");
             };
             return finish(result, command);
         }
@@ -356,44 +549,54 @@ public final class ChainExecutor {
          * each COMMAND: run COMMAND once per item with that item as its pipe value, through the normal command path
          * (so expansion, the plain-value rule and escaping apply to every run). Output: the values the runs produced.
          */
-        private ExecResult each(Node.Command command, String body, Piped input, boolean feedsPipe) {
+        private Outcome each(Node.Command command, String body, Piped input, boolean feedsPipe) {
             if (body.isBlank()) {
                 runner.reportError(label(command) + "each needs a command");
-                return ExecResult.failure();
+                return finish(ExecResult.failure(), command);
             }
             if (input.items().isEmpty()) {
                 // Nothing to do (e.g. a grep that matched nothing): a quiet failure, like bash's exit status.
-                return new ExecResult(false, false, 0, List.of(), new PipeValue.Items(List.of()));
+                return finish(new ExecResult(false, false, 0, List.of(), new PipeValue.Items(List.of())), command);
             }
             Node.Command run = new Node.Command(body.strip());
-            numbers.put(run, numbers.get(command));
+            state.numbers.put(run, state.numbers.get(command));
             boolean allSucceeded = true;
             int succeeded = 0;
             List<String> collected = new java.util.ArrayList<>();
-            for (String item : input.items()) {
-                ExecResult result = command(run, new Piped(PipeValue.of(item), input.result(), List.of(item)), feedsPipe).result();
-                if (result.success()) {
-                    succeeded++;
-                } else {
-                    allSucceeded = false;
-                }
-                if (!result.errored()) {
-                    try {
-                        collected.add(piped(result).value().asArgument());
-                    } catch (PipeException e) {
-                        // A run without a value adds nothing.
+            String outer = noPause;
+            noPause = "inside each";
+            try {
+                for (String item : input.items()) {
+                    Outcome outcome = command(run, new Piped(PipeValue.of(item), input.result(), List.of(item)), feedsPipe);
+                    if (outcome.halt() != null) {
+                        return finish(ExecResult.failure(), command).halted(outcome.halt());
+                    }
+                    ExecResult result = outcome.result();
+                    if (result.success()) {
+                        succeeded++;
+                    } else {
+                        allSucceeded = false;
+                    }
+                    if (!result.errored()) {
+                        try {
+                            collected.add(piped(result).value().asArgument());
+                        } catch (PipeException e) {
+                            // A run without a value adds nothing.
+                        }
+                    }
+                    if (budgetExceeded || expansionFailed) {
+                        // Stop rather than report the same refusal once per item.
+                        break;
                     }
                 }
-                if (budgetExceeded || expansionFailed) {
-                    // Stop rather than report the same refusal once per item.
-                    break;
-                }
+            } finally {
+                noPause = outer;
             }
-            return new ExecResult(allSucceeded && succeeded > 0, false, succeeded, List.of(), new PipeValue.Items(collected));
+            return finish(new ExecResult(allSucceeded && succeeded > 0, false, succeeded, List.of(), new PipeValue.Items(collected)), command);
         }
 
         private Outcome finish(ExecResult result, Node.Command command) {
-            lastStatus = result.success() ? 0 : 1;
+            state.lastStatus = result.success() ? 0 : 1;
             return new Outcome(result, command.text());
         }
 
@@ -438,7 +641,12 @@ public final class ChainExecutor {
                 }
                 Map<Node.Command, Integer> innerNumbers = new IdentityHashMap<>();
                 number(node, innerNumbers);
-                ExecResult result = new Run(innerNumbers, false, positionals).node(node, null, true).result();
+                Outcome outcome = new Run(new RunState(innerNumbers, false, state.positionals, state.level), "inside $(…)")
+                        .node(node, null, true);
+                if (outcome.halt() != null) {
+                    throw new ChainStopped();
+                }
+                ExecResult result = outcome.result();
                 if (result.errored()) {
                     throw new ExpansionException("$(…) produced no value");
                 }
@@ -451,29 +659,32 @@ public final class ChainExecutor {
         }
 
         /** Runs an alias body as a nested chain with the call's words as $1…$9/$@/$#; output shown as usual. */
-        private ExecResult callAlias(Node.Command command, String name, String body, Piped input, boolean feedsPipe) {
+        private Outcome callAlias(Node.Command command, String name, String body, Piped input, boolean feedsPipe) {
             String rest = command.text().substring(name.length());
             // A piped value fills placeholders in the call's arguments if there are any; otherwise it goes to the body.
             boolean placesInput = input != null && Expander.scan(rest, true).stream()
                     .anyMatch(reference -> reference.kind() == Expander.Kind.PLACEHOLDER);
             Arguments words;
             try {
-                Expander.Expansion expansion = Expander.expandParts(rest, variables, lastStatus, this::substitute,
-                        placesInput ? new Expander.PipeInput(input.value(), input.result()) : null, positionals);
+                Expander.Expansion expansion = Expander.expandParts(rest, variables, state.lastStatus, this::substitute,
+                        placesInput ? new Expander.PipeInput(input.value(), input.result()) : null, state.positionals);
                 List<Words.Word> spans = Words.spans(expansion.join(false));
                 words = new Arguments(spans.stream().map(Words.Word::text).toList(),
                         spans.stream().map(word -> expansion.untrustedOverlaps(word.start(), word.end())).toList());
             } catch (ExpansionException e) {
                 expansionFailed = true;
+                if (e instanceof ChainStopped) {
+                    return new Outcome(ExecResult.failure(), command.text(), Halt.stop());
+                }
                 runner.reportError(label(command) + e.getMessage());
-                return ExecResult.failure();
+                return new Outcome(ExecResult.failure(), command.text());
             }
             Node node;
             try {
                 node = NodeParser.parse(body, NodeParser.Mode.SH, Integer.MAX_VALUE);
             } catch (ChainSyntaxException e) {
                 runner.reportError(label(command) + "alias " + name + ": " + e.getMessage());
-                return ExecResult.failure();
+                return new Outcome(ExecResult.failure(), command.text());
             }
             if (!words.words().isEmpty() && !Expander.hasPositionals(body)) {
                 node = appendArguments(node);
@@ -481,17 +692,19 @@ public final class ChainExecutor {
             Optional<DepthGuard.Scope> scope = DepthGuard.enter(maxDepth);
             if (scope.isEmpty()) {
                 runner.reportError(label(command) + "aliases nested deeper than " + maxDepth);
-                return ExecResult.failure();
+                return new Outcome(ExecResult.failure(), command.text());
             }
             try (DepthGuard.Scope ignored = scope.get()) {
                 if (!DepthGuard.spend(maxTotalCommands)) {
                     budgetExceeded = true;
                     runner.reportError(label(command) + "too many commands across nested chains (max " + maxTotalCommands + ")");
-                    return ExecResult.failure();
+                    return new Outcome(ExecResult.failure(), command.text());
                 }
                 Map<Node.Command, Integer> innerNumbers = new IdentityHashMap<>();
                 number(node, innerNumbers);
-                return new Run(innerNumbers, false, words).node(node, placesInput ? null : input, feedsPipe).result();
+                // Inside a pipe, $( … ) or each, the body can't pause either.
+                return new Run(new RunState(innerNumbers, false, words, state.level + 1), noPause)
+                        .node(node, placesInput ? null : input, feedsPipe);
             }
         }
 
@@ -564,7 +777,7 @@ public final class ChainExecutor {
         }
 
         private String label(Node.Command command) {
-            return numbered ? "[" + numbers.get(command) + "] " : "";
+            return state.numbered ? "[" + state.numbers.get(command) + "] " : "";
         }
     }
 }

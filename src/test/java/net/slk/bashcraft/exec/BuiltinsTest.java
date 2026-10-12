@@ -45,4 +45,10 @@ class BuiltinsTest {
         assertEquals(Builtins.Kind.NONE, Builtins.classify("grepper x").kind());
         assertEquals(Builtins.Kind.NONE, Builtins.classify("storefront").kind());
     }
+
+    @Test
+    void sleepIsABuiltin() {
+        assertEquals(new Builtins.Call(Builtins.Kind.SLEEP, "", "20"), Builtins.classify("sleep 20"));
+        assertEquals(Builtins.Kind.NONE, Builtins.classify("sleepy 20").kind());
+    }
 }
