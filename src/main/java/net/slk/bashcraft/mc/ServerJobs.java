@@ -1,11 +1,11 @@
 package net.slk.bashcraft.mc;
 
 import net.minecraft.commands.CommandResultCallback;
-import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
 import net.slk.bashcraft.Bashcraft;
 import net.slk.bashcraft.config.BashcraftConfig;
 import net.slk.bashcraft.exec.ChainExecutor;
@@ -15,7 +15,6 @@ import net.slk.bashcraft.exec.ExpansionException;
 import net.slk.bashcraft.exec.JobTable;
 import net.slk.bashcraft.exec.Jobs;
 import net.slk.bashcraft.exec.ShellContext;
-import net.slk.bashcraft.mixin.CommandSourceStackAccessor;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,11 +22,15 @@ import java.util.UUID;
 
 /**
  * The server's waiting chains (spec C3 §5–6). A chain a player typed wakes as that player is now (position, dimension,
- * permission); any other chain as the source it started with. Server thread only.
+ * permission); any other chain as the source it started with, never with more permission than the player whose
+ * command started it (if any) has now. Server thread only.
  */
 public final class ServerJobs {
-    /** A waiting chain and how to find its source again: the player who typed it, else the source it started with. */
-    private record Waiting(Continuation continuation, UUID typist, CommandSourceStack saved) {}
+    /**
+     * A waiting chain and how to find its source again: the player who typed it, else the source it started with and
+     * the player whose command started that (null for command blocks, functions run by the server, the console).
+     */
+    private record Waiting(Continuation continuation, UUID typist, CommandSourceStack saved, NameAndId starter) {}
 
     private static JobTable<Waiting> table = newTable();
 
@@ -99,7 +102,11 @@ public final class ServerJobs {
             return Optional.ofNullable(server.getPlayerList().getPlayer(waiting.typist())).map(ServerPlayer::createCommandSourceStack);
         }
         CommandSourceStack saved = waiting.saved();
-        return saved.getEntity() != null && saved.getEntity().isRemoved() ? Optional.empty() : Optional.of(saved);
+        if (saved.getEntity() != null && saved.getEntity().isRemoved()) {
+            return Optional.empty();
+        }
+        // A de-opped player's chain, even one run as another entity, can't keep their old permission.
+        return Optional.of(waiting.starter() == null ? saved : saved.withMaximumPermission(server.getProfilePermissions(waiting.starter())));
     }
 
     /**
@@ -107,11 +114,7 @@ public final class ServerJobs {
      * console) and without a result callback (whoever ran /sh had its result long ago).
      */
     private static CommandSourceStack saved(CommandSourceStack source) {
-        CommandSource origin = ((CommandSourceStackAccessor) source).bashcraft$source();
-        while (origin instanceof TeeSource tee) {
-            origin = tee.target();
-        }
-        return source.withSource(origin).withCallback(CommandResultCallback.EMPTY);
+        return source.withSource(Sources.origin(source)).withCallback(CommandResultCallback.EMPTY);
     }
 
     /** One chain's view of the table: who owns the jobs it queues, and which jobs it may see and cancel. */
@@ -130,13 +133,14 @@ public final class ServerJobs {
         public void queue(Continuation continuation, int delay, String text) throws ExpansionException {
             Optional<ServerPlayer> typist = Sources.typist(source);
             table.add(owner(), typist.map(player -> player.getName().getString()).orElse(source.getTextName()), text, delay,
-                    new Waiting(continuation, typist.map(ServerPlayer::getUUID).orElse(null), typist.isPresent() ? null : saved(source)));
+                    typist.isPresent() ? new Waiting(continuation, typist.get().getUUID(), null, null)
+                            : new Waiting(continuation, null, saved(source), Sources.starter(source).map(ServerPlayer::nameAndId).orElse(null)));
         }
 
         @Override
         public void requeue(Continuation continuation, int delay) throws ExpansionException {
             Waiting waiting = resuming.payload();
-            table.requeue(resuming.number(), delay, new Waiting(continuation, waiting.typist(), waiting.saved()));
+            table.requeue(resuming.number(), delay, new Waiting(continuation, waiting.typist(), waiting.saved(), waiting.starter()));
             requeued = true;
         }
 

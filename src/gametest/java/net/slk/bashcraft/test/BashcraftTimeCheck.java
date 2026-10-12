@@ -18,7 +18,7 @@ public class BashcraftTimeCheck implements FabricClientGameTest {
     public void runTest(ClientGameTestContext context) {
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
             TestServerContext server = singleplayer.getServer();
-            server.runCommand("fill 0 120 20 15 120 20 minecraft:air");
+            server.runCommand("fill 0 120 20 20 120 20 minecraft:air");
 
             server.runCommand("sh setblock 0 120 20 minecraft:stone ; sleep 20 ; setblock 1 120 20 minecraft:stone");
             check(stone(server, 0) && !stone(server, 1), "a chain pauses at sleep");
@@ -72,15 +72,23 @@ public class BashcraftTimeCheck implements FabricClientGameTest {
             check(stone(server, 7), "a player can't cancel another's job");
 
             // An operator's waiting chain has their permission only while they keep it.
+            // So does one they start as another entity (execute as … run sh), which wakes as that entity.
+            server.runCommand("summon minecraft:armor_stand 0 121 22 {Tags:[\"keeper\"],NoGravity:1b}");
             server.runOnServer(s -> s.getPlayerList().op(player(s).nameAndId()));
             context.runOnClient(client -> client.getConnection().sendCommand("sh sleep 10 ; setblock 9 120 20 minecraft:stone"));
+            context.runOnClient(client -> client.getConnection().sendCommand(
+                    "execute as @e[tag=keeper] run sh sleep 10 ; setblock 16 120 20 minecraft:stone"));
             context.waitTicks(15);
             check(stone(server, 9), "an operator's waiting chain keeps their powers");
+            check(stone(server, 16), "an operator's chain started as another entity keeps their powers");
             context.runOnClient(client -> client.getConnection().sendCommand("sh sleep 20 ; setblock 10 120 20 minecraft:stone"));
+            context.runOnClient(client -> client.getConnection().sendCommand(
+                    "execute as @e[tag=keeper] run sh sleep 20 ; setblock 15 120 20 minecraft:stone"));
             context.waitTicks(3);
             server.runOnServer(s -> s.getPlayerList().deop(player(s).nameAndId()));
             context.waitTicks(25);
             check(!stone(server, 10), "a waiting chain loses its powers after a de-op");
+            check(!stone(server, 15), "a chain started as another entity loses its powers after a de-op");
         }
     }
 

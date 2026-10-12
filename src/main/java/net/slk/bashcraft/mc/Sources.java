@@ -15,11 +15,25 @@ public final class Sources {
         if (!(source.getEntity() instanceof ServerPlayer player) || source.isSilent()) {
             return Optional.empty();
         }
+        return origin(source) == player.commandSource() ? Optional.of(player) : Optional.empty();
+    }
+
+    /** What started the command: the player, command block or console behind any pipe tees. */
+    public static CommandSource origin(CommandSourceStack source) {
         CommandSource origin = ((CommandSourceStackAccessor) source).bashcraft$source();
         while (origin instanceof TeeSource tee) {
             origin = tee.target();
         }
-        return origin == player.commandSource() ? Optional.of(player) : Optional.empty();
+        return origin;
+    }
+
+    /**
+     * The player whose command this is, when they didn't type it as themselves: run as another entity
+     * ({@code execute as … run}) or through a function they ran.
+     */
+    public static Optional<ServerPlayer> starter(CommandSourceStack source) {
+        CommandSource origin = origin(source);
+        return source.getServer().getPlayerList().getPlayers().stream().filter(player -> player.commandSource() == origin).findFirst();
     }
 
     /** A command the player typed themselves, not one run from inside a chain. */
