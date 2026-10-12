@@ -101,6 +101,21 @@ public class BashcraftTimeCheck implements FabricClientGameTest {
             context.waitTicks(25);
             check(!stone(server, 10), "a waiting chain loses its powers after a de-op");
             check(!stone(server, 15), "a chain started as another entity loses its powers after a de-op");
+
+            // A part such a chain queues as it wakes keeps the player who started it, even after they respawned (a new
+            // player object, so their old source no longer matches): it too loses their powers after a de-op.
+            server.runOnServer(s -> s.getPlayerList().op(player(s).nameAndId()));
+            context.runOnClient(client -> client.getConnection().sendCommand("execute as @e[tag=keeper] run sh sleep 20 ; "
+                    + "(sleep 20 ; setblock 19 120 20 minecraft:stone) & setblock 20 120 20 minecraft:stone"));
+            context.waitTicks(3);
+            server.runCommand("kill @a");
+            context.waitTicks(2);
+            context.runOnClient(client -> client.player.respawn());
+            context.waitTicks(25);
+            check(stone(server, 20), "the chain wakes after its player respawned");
+            server.runOnServer(s -> s.getPlayerList().deop(player(s).nameAndId()));
+            context.waitTicks(25);
+            check(!stone(server, 19), "a part queued as it woke loses the player's powers after a de-op");
         }
     }
 

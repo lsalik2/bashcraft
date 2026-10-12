@@ -33,6 +33,11 @@ public final class ServerJobs {
     private record Waiting(Continuation continuation, UUID typist, CommandSourceStack saved, NameAndId starter) {}
 
     private static JobTable<Waiting> table = newTable();
+    /**
+     * While a job wakes, the player who started it: what it queues (a part after {@code &}, a nested {@code sh}) has
+     * a source whose player may have left or respawned since, so they can't be found from it again.
+     */
+    private static NameAndId wakingStarter;
 
     private ServerJobs() {}
 
@@ -70,12 +75,14 @@ public final class ServerJobs {
     private static void wake(MinecraftServer server, JobTable.Due<Waiting> due) {
         Optional<CommandSourceStack> source = sourceOf(server, due.payload());
         View jobs = new View(source.orElse(null), due);
+        wakingStarter = due.payload().starter();
         try {
             source.ifPresent(stack -> resume(stack, jobs, due.payload()));
         } catch (RuntimeException e) {
             // An exception out of a tick handler would stop the server; the broken job just ends.
             Bashcraft.LOGGER.error("BashCraft: waiting chain %{} failed", due.number(), e);
         } finally {
+            wakingStarter = null;
             if (!jobs.requeued) {
                 table.finish(due.number());
             }
@@ -123,6 +130,11 @@ public final class ServerJobs {
         return source.withSource(Sources.origin(source)).withCallback(CommandResultCallback.EMPTY);
     }
 
+    /** The player whose command started a chain no player typed, if any (see {@link #wakingStarter}). */
+    private static NameAndId starter(CommandSourceStack source) {
+        return Sources.starter(source).map(ServerPlayer::nameAndId).orElse(wakingStarter);
+    }
+
     /** One chain's view of the table: who owns the jobs it queues, and which jobs it may see and cancel. */
     private static final class View implements Jobs {
         private final CommandSourceStack source;
@@ -140,7 +152,7 @@ public final class ServerJobs {
             Optional<ServerPlayer> typist = Sources.typist(source);
             table.add(owner(), typist.map(player -> player.getName().getString()).orElse(source.getTextName()), text, delay,
                     typist.isPresent() ? new Waiting(continuation, typist.get().getUUID(), null, null)
-                            : new Waiting(continuation, null, saved(source), Sources.starter(source).map(ServerPlayer::nameAndId).orElse(null)));
+                            : new Waiting(continuation, null, saved(source), starter(source)));
         }
 
         @Override
