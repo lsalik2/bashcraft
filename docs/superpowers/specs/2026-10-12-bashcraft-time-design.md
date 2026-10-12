@@ -49,7 +49,8 @@
   `a ; b & c` backgrounds only `b`; `a | b & c` backgrounds the pipeline. A trailing `&` is allowed (`… & `, and
   before `)`).
 - **`/sh`:** every unquoted lone `&` is an operator now. `\&` or quotes keep it as text (`say Tom \& Jerry`).
-  `&&` is unchanged. `& x`, `a & & b`, `a & ; b` are syntax errors (`missing command`).
+  `&&` is unchanged, and `\&&` still means a literal `&&`. `& x`, `a & & b`, `a & ; b` are syntax errors
+  (`unexpected '&'`, `unexpected ';'`).
 - **Transparent mode:** `&` counts only when the next non-space character is `/` (directly or after `(`), like the
   other operators; `/say Tom & Jerry` and a trailing `&` stay text.
 
