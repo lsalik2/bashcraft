@@ -51,4 +51,18 @@ class BashcraftConfigTest {
         assertEquals(1, config.maxSegments);
         assertEquals(1, config.maxDepth);
     }
+
+    @Test
+    void timeLimitsHaveDefaultsAndAreAtLeastOne() throws Exception {
+        BashcraftConfig defaults = BashcraftConfig.load(dir.resolve("a.json"));
+        assertEquals(72000, defaults.maxSleepTicks);
+        assertEquals(8, defaults.maxJobsPerPlayer);
+        assertEquals(64, defaults.maxJobs);
+        Path file = dir.resolve("b.json");
+        Files.writeString(file, "{\"maxSleepTicks\": 0, \"maxJobsPerPlayer\": -1, \"maxJobs\": 0}");
+        BashcraftConfig config = BashcraftConfig.load(file);
+        assertEquals(1, config.maxSleepTicks);
+        assertEquals(1, config.maxJobsPerPlayer);
+        assertEquals(1, config.maxJobs);
+    }
 }

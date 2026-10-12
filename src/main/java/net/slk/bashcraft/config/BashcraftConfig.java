@@ -26,6 +26,12 @@ public final class BashcraftConfig {
     public int maxTotalCommands = 256;
     /** Hide success messages of commands that feed a pipe. */
     public boolean swallowPipedOutput = true;
+    /** Longest single sleep, in ticks (an hour). */
+    public int maxSleepTicks = 72000;
+    /** Waiting chains one player may have. */
+    public int maxJobsPerPlayer = 8;
+    /** Waiting chains on the whole server. */
+    public int maxJobs = 64;
 
     public static BashcraftConfig get() {
         return instance;
@@ -51,6 +57,9 @@ public final class BashcraftConfig {
         config.maxSegments = Math.max(1, config.maxSegments);
         config.maxDepth = Math.max(1, config.maxDepth);
         config.maxTotalCommands = Math.max(1, config.maxTotalCommands);
+        config.maxSleepTicks = Math.max(1, config.maxSleepTicks);
+        config.maxJobsPerPlayer = Math.max(1, config.maxJobsPerPlayer);
+        config.maxJobs = Math.max(1, config.maxJobs);
         instance = config;
         return config;
     }
