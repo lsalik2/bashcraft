@@ -5,3 +5,5 @@ out/
 .idea/
 *.iml
 logs/
+.superpowers/
+__pycache__/
