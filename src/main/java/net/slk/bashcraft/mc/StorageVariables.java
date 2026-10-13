@@ -1,6 +1,5 @@
 package net.slk.bashcraft.mc;
 
-import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.nbt.CompoundTag;
@@ -10,7 +9,6 @@ import net.minecraft.world.level.storage.CommandStorage;
 import net.slk.bashcraft.exec.ExpansionException;
 import net.slk.bashcraft.exec.VariableTable;
 import net.slk.bashcraft.exec.Variables;
-import net.slk.bashcraft.mixin.CommandSourceStackAccessor;
 
 import java.util.Map;
 import java.util.Optional;
@@ -41,17 +39,8 @@ public final class StorageVariables implements Variables {
         ServerPlayer entityPlayer = source.getEntity() instanceof ServerPlayer serverPlayer ? serverPlayer : null;
         return new StorageVariables(source.getServer().getCommandStorage(),
                 entityPlayer == null ? null : entityPlayer.getUUID().toString(),
-                entityPlayer != null && typedBy(source, entityPlayer),
+                Sources.typist(source).isPresent(),
                 Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source));
-    }
-
-    /** The chain came from this player's own command (through any nesting), not a function or another source. */
-    private static boolean typedBy(CommandSourceStack source, ServerPlayer player) {
-        CommandSource origin = ((CommandSourceStackAccessor) source).bashcraft$source();
-        while (origin instanceof TeeSource tee) {
-            origin = tee.target();
-        }
-        return origin == player.commandSource() && !source.isSilent();
     }
 
     @Override

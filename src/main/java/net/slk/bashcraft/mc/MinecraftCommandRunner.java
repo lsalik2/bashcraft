@@ -3,7 +3,6 @@ package net.slk.bashcraft.mc;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.context.ContextChain;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.execution.ExecutionContext;
@@ -11,7 +10,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.SignableCommand;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.slk.bashcraft.exec.CommandRunner;
 import net.slk.bashcraft.exec.ExecResult;
@@ -45,7 +43,7 @@ public final class MinecraftCommandRunner implements CommandRunner {
         Commands commands = stack.getServer().getCommands();
         ParseResults<CommandSourceStack> parse = commands.getDispatcher().parse(command, stack);
         // /sh's own argument isn't signed, so a player's msg/me/say inside it would bypass chat signing and filtering.
-        if (typedByPlayer(tee) && SignableCommand.hasSignableArguments(parse)) {
+        if (Sources.typist(invoker).isPresent() && SignableCommand.hasSignableArguments(parse)) {
             reportError(prefix(options) + "chat commands like msg, me and say can't run inside /sh when a player types it");
             return ExecResult.failure();
         }
@@ -100,16 +98,6 @@ public final class MinecraftCommandRunner implements CommandRunner {
      * The chain came from a player's own command packet: not the console running {@code execute as @p}, and not a
      * function or advancement reward the player runs (those keep the player's source but always suppress output).
      */
-    private boolean typedByPlayer(TeeSource tee) {
-        ServerPlayer player = invoker.getPlayer();
-        CommandSource origin = tee.target();
-        while (origin instanceof TeeSource outer) {
-            // A nested sh's segments run with the outer segment's tee as their source.
-            origin = outer.target();
-        }
-        return player != null && player.commandSource() == origin && !invoker.isSilent();
-    }
-
     private static String prefix(RunOptions options) {
         return options.failurePrefix() == null ? "" : options.failurePrefix();
     }
