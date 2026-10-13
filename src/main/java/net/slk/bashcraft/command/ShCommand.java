@@ -17,6 +17,7 @@ import net.slk.bashcraft.config.BashcraftConfig;
 import net.slk.bashcraft.exec.ChainExecutor;
 import net.slk.bashcraft.exec.DepthGuard;
 import net.slk.bashcraft.exec.ExecResult;
+import net.slk.bashcraft.exec.History;
 import net.slk.bashcraft.exec.ShellContext;
 import net.slk.bashcraft.mc.HistoryBook;
 import net.slk.bashcraft.mc.MinecraftCommandRunner;
@@ -61,8 +62,7 @@ public final class ShCommand {
             }
             Optional<String> resolved = HistoryBook.of(Sources.typist(source).orElseThrow()).resolve(line);
             if (resolved.isEmpty()) {
-                source.sendFailure(Component.literal(line.equals("!") ? "BashCraft: ! needs a prefix (!! reruns your last line)"
-                        : "BashCraft: no history matching " + line.substring(1)));
+                source.sendFailure(Component.literal("BashCraft: " + History.noMatch(line)));
                 return ExecResult.failure();
             }
             line = resolved.get();

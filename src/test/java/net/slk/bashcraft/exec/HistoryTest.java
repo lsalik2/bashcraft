@@ -41,4 +41,11 @@ class HistoryTest {
         assertEquals(Optional.empty(), history.resolve("!"), "!! reruns the last line; ! alone is not a prefix");
         assertEquals(Optional.of("say hi"), history.resolve("!!"));
     }
+
+    @Test
+    void messagesForALineWithNoMatch() {
+        assertEquals("! needs a prefix (!! reruns your last line)", History.noMatch("!"));
+        assertEquals("no history matching tp", History.noMatch("!tp"));
+        assertEquals("no history matching tp", History.noMatch("! tp"));
+    }
 }

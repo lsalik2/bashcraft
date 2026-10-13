@@ -40,6 +40,12 @@ public final class History {
         return Optional.empty();
     }
 
+    /** Why {@code reference} ({@code !…}) matched no line. */
+    public static String noMatch(String reference) {
+        String prefix = reference.substring(1).strip();
+        return prefix.isEmpty() ? "! needs a prefix (!! reruns your last line)" : "no history matching " + prefix;
+    }
+
     public synchronized List<String> lines() {
         return List.copyOf(lines);
     }
