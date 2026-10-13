@@ -57,9 +57,11 @@ public final class ServerJobs {
         }
     }
 
-    /** A player left: the chains they typed end. Chains saved with them as the source end when they would wake. */
+    /** A player left: the chains they typed end, and so do chains that run as them (spec C3 §7). */
     public static void forget(UUID player) {
         table.cancelOwner(player.toString());
+        table.cancelIf(waiting -> waiting.saved() != null && waiting.saved().getEntity() != null
+                && waiting.saved().getEntity().getUUID().equals(player));
     }
 
     /** Jobs are never kept across a restart. */
@@ -69,7 +71,7 @@ public final class ServerJobs {
 
     private static JobTable<Waiting> newTable() {
         BashcraftConfig config = BashcraftConfig.get();
-        return new JobTable<>(config.maxJobs, config.maxJobsPerPlayer, config.maxSleepTicks);
+        return new JobTable<>(config.maxJobs, config.maxJobsPerPlayer, config.maxServerJobs, config.maxSleepTicks);
     }
 
     private static void wake(MinecraftServer server, JobTable.Due<Waiting> due) {

@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 
 /**
  * Waiting chains (spec C3 §4–6): numbered from the smallest free number, owned by a player (a key such as a UUID) or
@@ -43,12 +44,19 @@ public final class JobTable<T> {
     private final Map<String, Integer> budgets = new HashMap<>();
     private final int maxJobs;
     private final int maxPerOwner;
+    private final int maxServer;
     private final int maxDelay;
     private long now;
 
     public JobTable(int maxJobs, int maxPerOwner, int maxDelay) {
+        this(maxJobs, maxPerOwner, maxJobs, maxDelay);
+    }
+
+    /** @param maxServer jobs the server (null owner) may have together, so players keep the rest of {@code maxJobs} */
+    public JobTable(int maxJobs, int maxPerOwner, int maxServer, int maxDelay) {
         this.maxJobs = maxJobs;
         this.maxPerOwner = maxPerOwner;
+        this.maxServer = maxServer;
         this.maxDelay = maxDelay;
     }
 
@@ -58,8 +66,9 @@ public final class JobTable<T> {
         if (jobs.size() >= maxJobs) {
             throw new ExpansionException("too many waiting chains (max " + maxJobs + ")");
         }
-        if (owner != null && jobs.values().stream().filter(job -> owner.equals(job.owner)).count() >= maxPerOwner) {
-            throw new ExpansionException("too many waiting chains (max " + maxPerOwner + ")");
+        int ownerLimit = owner == null ? maxServer : maxPerOwner;
+        if (jobs.values().stream().filter(job -> Objects.equals(owner, job.owner)).count() >= ownerLimit) {
+            throw new ExpansionException("too many waiting chains (max " + ownerLimit + ")");
         }
         int number = 1;
         while (jobs.containsKey(number)) {
@@ -148,6 +157,15 @@ public final class JobTable<T> {
     public void cancelOwner(String owner) {
         for (Job<T> job : List.copyOf(jobs.values())) {
             if (owner.equals(job.owner)) {
+                cancel(job);
+            }
+        }
+    }
+
+    /** Ends every job whose payload matches (a player left whose entity the job runs as). */
+    public void cancelIf(Predicate<T> matches) {
+        for (Job<T> job : List.copyOf(jobs.values())) {
+            if (matches.test(job.payload)) {
                 cancel(job);
             }
         }

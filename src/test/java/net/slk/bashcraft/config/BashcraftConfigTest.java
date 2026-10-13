@@ -65,4 +65,12 @@ class BashcraftConfigTest {
         assertEquals(1, config.maxJobsPerPlayer);
         assertEquals(1, config.maxJobs);
     }
+
+    @Test
+    void serverJobLimitHasADefaultAndIsAtLeastOne() throws Exception {
+        assertEquals(32, BashcraftConfig.load(dir.resolve("s1.json")).maxServerJobs);
+        Path file = dir.resolve("s2.json");
+        Files.writeString(file, "{\"maxServerJobs\": 0}");
+        assertEquals(1, BashcraftConfig.load(file).maxServerJobs);
+    }
 }

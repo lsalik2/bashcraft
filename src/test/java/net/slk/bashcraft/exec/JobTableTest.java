@@ -125,4 +125,30 @@ class JobTableTest {
         table.tick();
         assertEquals(0, table.budgetSpent("p"), "a new second");
     }
+
+    @Test
+    void serverJobsHaveTheirOwnCap() throws Exception {
+        JobTable<String> table = new JobTable<>(4, 2, 2, 100);
+        table.add(null, "Server", "a", 5, "A");
+        table.add(null, "Server", "b", 5, "B");
+        assertEquals("too many waiting chains (max 2)",
+                assertThrows(ExpansionException.class, () -> table.add(null, "Server", "c", 5, "C")).getMessage());
+        table.add("p", "Steve", "d", 5, "D");
+        table.add("q", "Alex", "e", 5, "E");
+        assertEquals(4, table.size(), "players keep the slots the server can't take");
+    }
+
+    @Test
+    void cancelIfEndsMatchingJobs() throws Exception {
+        JobTable<String> table = new JobTable<>(64, 8, 1000);
+        table.add(null, "Server", "a", 5, "as steve");
+        table.add(null, "Server", "b", 5, "other");
+        table.add(null, "Server", "c", 1, "as steve");
+        table.tick();
+        assertEquals(3, table.nextDue().orElseThrow().number());
+        table.cancelIf("as steve"::equals);
+        assertEquals(List.of("%2  4t  Server: b"), table.listing(null, true));
+        table.requeue(3, 5, "as steve");
+        assertEquals(1, table.size(), "a running job ends at its next pause");
+    }
 }

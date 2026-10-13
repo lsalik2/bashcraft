@@ -32,6 +32,8 @@ public final class BashcraftConfig {
     public int maxJobsPerPlayer = 8;
     /** Waiting chains on the whole server. */
     public int maxJobs = 64;
+    /** Waiting chains of command blocks, functions, the console and execute as, together (players keep the rest). */
+    public int maxServerJobs = 32;
 
     public static BashcraftConfig get() {
         return instance;
@@ -60,6 +62,7 @@ public final class BashcraftConfig {
         config.maxSleepTicks = Math.max(1, config.maxSleepTicks);
         config.maxJobsPerPlayer = Math.max(1, config.maxJobsPerPlayer);
         config.maxJobs = Math.max(1, config.maxJobs);
+        config.maxServerJobs = Math.max(1, config.maxServerJobs);
         instance = config;
         return config;
     }
