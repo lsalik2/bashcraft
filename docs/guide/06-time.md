@@ -41,7 +41,7 @@ background, is listed, and is cancelled before it fires — all in one line, so 
 
 You'll see the timer listed as `%1`, and `too late` never appears.
 
-![A timer listed by jobs](../images/screens/jobs.png)
+![Three timers listed by jobs](../images/screens/jobs.png)
 
 ## Timers that repeat
 

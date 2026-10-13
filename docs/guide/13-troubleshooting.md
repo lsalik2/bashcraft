@@ -59,6 +59,12 @@ everything after `/sh` is just text.) The [client companion](08-client-companion
 In [transparent mode](07-without-sh.md) every command after an operator must start with `/`: `/a && /b`, not
 `/a && b`.
 
+## `/locate` "fails" when I'm already there
+
+`/locate` reports the distance as its result, and a result of 0 counts as a failure for `&&` and `||` (the
+command-block rule). So standing right on the structure makes `locate … || …` take the fallback. A pipe still passes
+the coordinates along: only `&&` and `||` care about the result.
+
 ## `@s` does nothing in my command block
 
 A command block isn't an entity, so `@s` matches nothing there. Use `@p` or another selector.

@@ -53,11 +53,11 @@ Some commands produce lists: `/list` gives the online players, `/tag … list`, 
 
 ```text
 /sh list | each echo {value} is online
-/sh list | each give {value} minecraft:bread 3
+/sh list | each data get entity {value} XpLevel
 /sh echo apple | grep -x apple && echo found it
 ```
 
-The second line gives bread to everyone online. `grep` fails if nothing is left, so `&&` works as a test.
+The second line reads every online player's own experience level — something one command for `@a` can't do. `grep` fails if nothing is left, so `&&` works as a test.
 
 ## Keep a value with `store`
 

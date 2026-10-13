@@ -41,8 +41,12 @@ public class BashcraftScreenshots implements FabricClientGameTest {
             c.waitTicks(65);
         });
         shoot(context, Path.of(out), "jobs", false, (c, s) -> {
-            type(c, s, "/sh (sleep 30s ; echo tea is ready) & echo timer started");
+            // Three timers, then only the list: what jobs shows, and the line that cancels one.
+            type(c, s, "/sh (sleep 30s ; echo tea is ready) & (sleep 45s ; echo pizza is ready) & (sleep 60s ; echo laundry is done) &");
+            c.runOnClient(client -> client.gui.hud.getChat().clearMessages(false));
             type(c, s, "/sh jobs");
+            c.runOnClient(client -> ChatProbe.open(client, "/sh kill %2"));
+            c.waitTicks(5);
         });
         shoot(context, Path.of(out), "pipe-surface", false, (c, s) -> {
             type(c, s, "/sh locate structure #village | surface | tp @s");
@@ -50,8 +54,12 @@ public class BashcraftScreenshots implements FabricClientGameTest {
             c.waitTicks(80);
         });
         shoot(context, Path.of(out), "alias", false, (c, s) -> {
+            // The alias itself (alias lists it), a call and its output, and the next call typed (the companion colours it).
             type(c, s, "/sh alias hop = 'tp @s ~ ~$1 ~ && echo up $1 blocks'");
+            type(c, s, "/sh alias");
             type(c, s, "/sh hop 5");
+            c.runOnClient(client -> ChatProbe.open(client, "/sh hop 10"));
+            c.waitTicks(5);
         });
         shoot(context, Path.of(out), "command-block", false, (c, s) -> {
             BlockPos pos = s.computeOnServer(server -> server.getPlayerList().getPlayers().getFirst().blockPosition().offset(2, 0, 0));
