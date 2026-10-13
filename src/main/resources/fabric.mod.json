@@ -3,8 +3,15 @@
 	"id": "bashcraft",
 	"version": "${version}",
 	"name": "BashCraft",
-	"description": "Logical operators and pipes for Minecraft commands.",
-	"authors": ["SLK"],
+	"description": "A bash shell for the command line: set timers, chain commands and much more.",
+	"authors": ["lsalik2"],
+	"contact": {
+		"homepage": "https://github.com/lsalik2/bashcraft/tree/main/docs/guide",
+		"sources": "https://github.com/lsalik2/bashcraft",
+		"issues": "https://github.com/lsalik2/bashcraft/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/bashcraft/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": ["net.slk.bashcraft.Bashcraft"],
