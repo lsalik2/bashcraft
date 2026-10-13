@@ -110,7 +110,7 @@ public final class MinecraftCommandRunner implements CommandRunner {
 
     /**
      * Gives the command its own top-level execution context so it finishes before this returns;
-     * otherwise it would be queued behind the running command (see docs/superpowers/notes/2026-10-01-m0-spike.md).
+     * otherwise it would be queued behind the running command.
      */
     private static void runNow(Commands commands, ParseResults<CommandSourceStack> parse, String command) {
         ThreadLocal<ExecutionContext<CommandSourceStack>> current = CommandsAccessor.bashcraft$currentExecutionContext();

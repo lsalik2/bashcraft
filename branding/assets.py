@@ -1,4 +1,4 @@
-"""The four BashCraft brand images, at their logical (1x) size. Spec: docs/superpowers/specs/2026-10-13-bashcraft-publishing-design.md §2."""
+"""The four BashCraft brand images, at their logical (1x) size."""
 from draw import Font, canvas, dim, hexc, paste, rect
 from png import upscale
 

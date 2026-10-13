@@ -71,6 +71,8 @@ functions and command blocks too.
 /sh alias global.lobby = tp @s 0 100 0
 ```
 
+![Defining and calling an alias](../images/screens/alias.png)
+
 ## History
 
 BashCraft remembers the lines you type this session. `!!` reruns your last line, `!PREFIX` the last one that starts
@@ -84,8 +86,6 @@ with PREFIX, and `history` lists them.
 /sh !echo
 /sh history
 ```
-
-![Defining and calling an alias](../images/screens/alias.png)
 
 ## Rules and limits
 
