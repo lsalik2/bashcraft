@@ -107,3 +107,17 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
 		args("--graphicsBackend", "vulkan")
 	}
 }
+
+// Re-captures the docs' screenshots into docs/images/screens (the screenshot check only runs when asked for).
+tasks.register("updateScreenshots") {
+	group = "documentation"
+	description = "Runs the client game tests and saves the docs' screenshots to docs/images/screens"
+	dependsOn "runClientGameTest"
+}
+tasks.matching { it.name == "runClientGameTest" }.configureEach {
+	doFirst {
+		if (gradle.taskGraph.hasTask(":updateScreenshots")) {
+			systemProperty "bashcraft.screenshots", file("docs/images/screens").absolutePath
+		}
+	}
+}
