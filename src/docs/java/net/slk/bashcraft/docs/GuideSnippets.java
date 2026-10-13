@@ -22,7 +22,7 @@ public final class GuideSnippets {
     private static final Pattern CHAT_COMMAND = Pattern.compile(
             "(?:^/sh\\s+|&&|\\|\\||;|\\||\\(|=\\s*'?)\\s*/?(say|msg|me|teammsg|tell|w)(?=\\s|$|')");
     private static final Pattern COMMENT = Pattern.compile("(?:^|\\s)#(?:\\s|$)");
-    private static final Pattern SLEEP = Pattern.compile("(?:^|[\\s;&|(/])sleep\\s+(\\S+)");
+    private static final Pattern SLEEP = Pattern.compile("(?:^|[\\s;&|(/])sleep\\s+([^\\s;&|)]+)");
     private static final int MAX_SLEEP_TICKS = 100;
 
     /** One snippet: its file, the 1-based line of its heading, its commands, and whether it should show an error. */
@@ -105,16 +105,18 @@ public final class GuideSnippets {
             if (COMMENT.matcher(command).find()) {
                 problems.add(where + " uses # as a comment (chains have no comments): " + command);
             }
+            // A reader pastes lines one at a time, so each line must be done (and its errors shown) within the cap.
+            long ticks = 0;
             Matcher sleep = SLEEP.matcher(command);
             while (sleep.find()) {
                 try {
-                    int ticks = SleepTime.ticks(sleep.group(1));
-                    if (ticks > MAX_SLEEP_TICKS) {
-                        problems.add(where + " sleeps " + ticks + " ticks (keep sleeps to " + MAX_SLEEP_TICKS + " ticks): " + command);
-                    }
+                    ticks += SleepTime.ticks(sleep.group(1));
                 } catch (ExpansionException e) {
                     // A variable or other expanded time: the in-game test still runs it.
                 }
+            }
+            if (ticks > MAX_SLEEP_TICKS) {
+                problems.add(where + " sleeps " + ticks + " ticks (keep sleeps to " + MAX_SLEEP_TICKS + " ticks a line): " + command);
             }
         }
         return problems;

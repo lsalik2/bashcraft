@@ -68,7 +68,7 @@ Re-running it reproduces the committed images byte for byte.
   `authors` `["lsalik2"]`; `license` `"MIT"`; `icon` `"assets/bashcraft/icon.png"`; `contact`: `homepage` = the
   guide on GitHub, `sources` = the repo, `issues` = its issue tracker.
 - `LICENSE`: MIT, "Copyright (c) 2026 lsalik2". It covers the code and the docs text. A note at its end (and in the
-  README) says the images in `docs/images/brand/` and the mod icon contain Minecraft textures and font © Mojang
+  README) says the images in `docs/images/` (brand art and screenshots) and the mod icon contain Minecraft textures and font © Mojang
   and are not covered by it, and the README carries "Not an official Minecraft product. Not approved by or
   associated with Mojang or Microsoft."
 - `.gitignore` gains `.superpowers/`.

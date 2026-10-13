@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** The published metadata (spec D §3): fabric.mod.json, the version, the license and its Mojang notice. */
 class ModMetadataTest {
     static final String SUMMARY = "A bash shell for the command line: set timers, chain commands and much more.";
-    static final String NOTICE = "The BashCraft icon and the images in docs/images/brand/ contain Minecraft textures and font © Mojang AB; they are not covered by the MIT license.";
+    static final String NOTICE = "The BashCraft icon and the images in docs/images/ (brand art and screenshots) contain Minecraft textures and font © Mojang AB; they are not covered by the MIT license.";
 
     static JsonObject modJson() throws IOException {
         return JsonParser.parseString(Files.readString(Path.of("src/main/resources/fabric.mod.json"))).getAsJsonObject();
@@ -74,5 +74,7 @@ class ModMetadataTest {
         assertTrue(listing.contains(SUMMARY), "the listing has the summary");
         assertTrue(Files.readString(Path.of("README.md")).contains(SUMMARY), "the README has the summary");
         assertTrue(Files.readString(Path.of("README.md")).contains("Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft."));
+        assertTrue(Files.readString(Path.of("README.md")).contains(NOTICE), "the README has the Mojang notice");
+        assertTrue(listing.replaceAll("\\s+", " ").contains(NOTICE), "the listing has the Mojang notice");
     }
 }

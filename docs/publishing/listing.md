@@ -80,6 +80,6 @@ bash. Questions or bugs: [issues](https://github.com/lsalik2/bashcraft/issues).
 
 ### License
 
-MIT. The BashCraft icon and the images in docs/images/brand/ contain Minecraft textures and font © Mojang AB; they are
-not covered by the MIT license. Not an official Minecraft product. Not approved by or associated with Mojang or
-Microsoft.
+MIT. The BashCraft icon and the images in docs/images/ (brand art and screenshots) contain Minecraft textures and font
+© Mojang AB; they are not covered by the MIT license. Not an official Minecraft product. Not approved by or associated
+with Mojang or Microsoft.

@@ -87,5 +87,5 @@ python3 -m unittest discover -s branding                         # branding test
 
 MIT — see [LICENSE](LICENSE).
 
-The BashCraft icon and the images in docs/images/brand/ contain Minecraft textures and font © Mojang AB; they are not covered by the MIT license.
+The BashCraft icon and the images in docs/images/ (brand art and screenshots) contain Minecraft textures and font © Mojang AB; they are not covered by the MIT license.
 Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.

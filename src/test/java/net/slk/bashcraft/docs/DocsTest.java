@@ -64,7 +64,7 @@ class DocsTest {
                 "p.md:1: line 2 uses say in a typed chain (refused there): /sh echo hi && say hi",
                 "p.md:1: line 3 uses msg in a typed chain (refused there): /sh alias x = 'msg @a hi'",
                 "p.md:1: line 4 uses # as a comment (chains have no comments): /sh echo a # note",
-                "p.md:1: line 5 sleeps 120 ticks (keep sleeps to 100 ticks): /sh sleep 6s ; echo late"),
+                "p.md:1: line 5 sleeps 120 ticks (keep sleeps to 100 ticks a line): /sh sleep 6s ; echo late"),
                 GuideSnippets.problems(bad));
         GuideSnippets.Snippet refusal = new GuideSnippets.Snippet("p.md", 1, List.of("/sh say hi"), true);
         assertEquals(List.of(), GuideSnippets.problems(refusal), "a snippet that shows the refusal may use say");
@@ -106,17 +106,11 @@ class DocsTest {
 
     @Test
     void repoUrlsPointAtRepoFiles() throws IOException {
-        Pattern repoUrl = Pattern.compile("https://(?:raw\\.githubusercontent\\.com/lsalik2/bashcraft/main|github\\.com/lsalik2/bashcraft/(?:blob|tree)/main)/([^)\\s\"'>]+)");
-        List<String> missing = new ArrayList<>();
+        List<String> bad = new ArrayList<>();
         for (Path file : GuideSnippets.docFiles(ROOT)) {
-            Matcher m = repoUrl.matcher(Files.readString(file));
-            while (m.find()) {
-                if (!Files.exists(ROOT.resolve(m.group(1)))) {
-                    missing.add(ROOT.relativize(file) + ": " + m.group(1));
-                }
-            }
+            bad.addAll(DocsLinks.badRepoUrls(ROOT.relativize(file).toString(), Files.readString(file), ROOT));
         }
-        assertEquals(List.of(), missing);
+        assertEquals(List.of(), bad);
     }
 
     @Test
@@ -139,5 +133,33 @@ class DocsTest {
             }
         }
         assertEquals(List.of(), missing);
+    }
+
+    @Test
+    void sleepsAreCappedPerLineAndReadUpToTheNextOperator() {
+        assertEquals(List.of("p.md:1: line 1 sleeps 4000 ticks (keep sleeps to 100 ticks a line): /sh sleep 200s;echo x"),
+                GuideSnippets.problems(new GuideSnippets.Snippet("p.md", 1, List.of("/sh sleep 200s;echo x"), false)));
+        assertEquals(List.of("p.md:1: line 1 sleeps 300 ticks (keep sleeps to 100 ticks a line): /sh sleep 5s ; sleep 5s ; sleep 5s ; echo x"),
+                GuideSnippets.problems(new GuideSnippets.Snippet("p.md", 1, List.of("/sh sleep 5s ; sleep 5s ; sleep 5s ; echo x"), false)));
+        assertEquals(List.of(), GuideSnippets.problems(new GuideSnippets.Snippet("p.md", 1, List.of("/sh echo 3 ; sleep 1s ; echo 2 ; sleep 1s ; echo 1"), false)));
+    }
+
+    @Test
+    void repoUrlCheckCatchesWrongBranchesTyposAndMissingFiles() throws IOException {
+        Path root = Files.createTempDirectory("repo");
+        Files.createDirectories(root.resolve("docs/images"));
+        Files.writeString(root.resolve("docs/images/a.png"), "x");
+        Files.writeString(root.resolve("docs/guide.md"), "x");
+        String text = String.join("\n",
+                "![ok](https://raw.githubusercontent.com/lsalik2/bashcraft/main/docs/images/a.png)",
+                "[ok](https://github.com/lsalik2/bashcraft/blob/main/docs/guide.md#part) [ok](https://github.com/lsalik2/bashcraft) [ok](https://github.com/lsalik2/bashcraft/issues)",
+                "![branch](https://raw.githubusercontent.com/lsalik2/bashcraft/master/docs/images/a.png)",
+                "![typo](https://raw.githubusercontent.com/lsalik2/bashcarft/main/docs/images/a.png)",
+                "![missing](https://raw.githubusercontent.com/lsalik2/bashcraft/main/docs/images/b.png)");
+        assertEquals(List.of(
+                "listing.md: https://raw.githubusercontent.com/lsalik2/bashcraft/master/docs/images/a.png is not a main-branch link to this repo",
+                "listing.md: https://raw.githubusercontent.com/lsalik2/bashcarft/main/docs/images/a.png is not a main-branch link to this repo",
+                "listing.md: https://raw.githubusercontent.com/lsalik2/bashcraft/main/docs/images/b.png points at a missing file"),
+                DocsLinks.badRepoUrls("listing.md", text, root));
     }
 }

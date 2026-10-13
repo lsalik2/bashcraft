@@ -11,7 +11,29 @@ import java.util.regex.Pattern;
 final class DocsLinks {
     private static final Pattern LINK = Pattern.compile("!?\\[[^\\]]*\\]\\(([^)\\s]+)(?:\\s+\"[^\"]*\")?\\)|<img[^>]*\\ssrc=\"([^\"]+)\"");
 
+    /** Any GitHub URL naming this repo's owner, or any raw.githubusercontent.com URL. */
+    private static final Pattern REPO_URL = Pattern.compile("https://(?:raw\\.githubusercontent\\.com|github\\.com/lsalik2)/[^)\\s\"'>]*");
+    /** The forms a link to this repo may take: its home, its issues, or a file or folder on main. */
+    private static final Pattern GOOD = Pattern.compile(
+            "https://github\\.com/lsalik2/bashcraft(?:/issues)?|https://(?:raw\\.githubusercontent\\.com/lsalik2/bashcraft/main|github\\.com/lsalik2/bashcraft/(?:blob|tree)/main)/(.+)");
+
     private DocsLinks() {}
+
+    /** URLs into this repo that use the wrong owner, name or branch, or point at a file that doesn't exist. */
+    static List<String> badRepoUrls(String name, String text, Path root) {
+        List<String> bad = new ArrayList<>();
+        Matcher m = REPO_URL.matcher(text);
+        while (m.find()) {
+            String url = m.group().replaceFirst("#.*$", "");
+            Matcher good = GOOD.matcher(url);
+            if (!good.matches()) {
+                bad.add(name + ": " + url + " is not a main-branch link to this repo");
+            } else if (good.group(1) != null && !Files.exists(root.resolve(good.group(1)))) {
+                bad.add(name + ": " + url + " points at a missing file");
+            }
+        }
+        return bad;
+    }
 
     static List<String> broken(Path file, List<String> lines, Path root) {
         List<String> broken = new ArrayList<>();
