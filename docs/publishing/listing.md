@@ -18,16 +18,16 @@ pasted into both as is.
 
 ## Gallery
 
-Upload in this order; the first one is the featured image.
+Upload in this order; the first one is the featured image. Titles and captions are plain text on both sites.
 
 | Image | Title | Caption |
 |---|---|---|
 | `docs/images/brand/featured.png` | The BashCraft spellbook | Recipes you can paste straight into chat. |
 | `docs/images/brand/gallery-cave.png` | A bash shell for the command line | Chain commands, pass results along and set timers. |
-| `docs/images/screens/countdown.png` | Timers | `sleep` pauses a chain without freezing the game. |
+| `docs/images/screens/countdown.png` | Timers | sleep pauses a chain without freezing the game. |
 | `docs/images/screens/chat-highlighting.png` | Chat companion | With the optional client install, chains are coloured as you type. |
-| `docs/images/screens/pipe-surface.png` | Pipes | `locate … \| surface \| tp @s` lands you in the nearest village. |
-| `docs/images/screens/jobs.png` | Jobs | See and cancel waiting chains with `jobs` and `kill %N`. |
+| `docs/images/screens/pipe-surface.png` | Pipes | One line finds the nearest village and lands you on the ground there. |
+| `docs/images/screens/jobs.png` | Jobs | See and cancel waiting chains with jobs and kill %N. |
 | `docs/images/screens/command-block.png` | Command blocks | Chains work in command blocks and functions too. |
 
 ## Description
@@ -52,6 +52,8 @@ blocks or functions. Players don't need to install anything.
 - **Timers** — `sleep` pauses a chain without freezing the game; `&` lets a timer run on its own.
 - **Aliases** — name a chain and use it like a command, with arguments.
 - **Groups** — `( … )` bundles commands so an operator applies to all of them.
+
+Try them in a creative world with cheats on — `tp`, `locate` and `surface` need operator permission:
 
 **Give it a try!**
 

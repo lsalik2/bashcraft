@@ -44,7 +44,7 @@ the group, and `&& echo c` runs if the group as a whole worked:
 ```
 
 The second line puts glass above your head — one block higher if the first spot can't take it — and then says so.
-Groups can nest as deep as you like.
+Groups can nest inside each other, up to 16 deep.
 
 ## A group's result
 
@@ -71,6 +71,7 @@ The first line prints its quotes too — quotes are passed to the command unchan
 - Precedence, loosest to tightest: `;` → `&&` and `||` (equal, left to right) → `|`. So `a | b && c ; d` means
   `((a | b) && c) ; d`, as in bash.
 - `(` opens a group only where a command could start; elsewhere it's text, as in `echo (hi)`.
+- Groups nest at most 16 deep: `groups nested deeper than 16`.
 - Inside a group, a `)` that doesn't close a `(` in the same command must be written `\)`. Once a line uses a group,
   a stray `)` anywhere in it is an error, not text.
 - `\&`, `\&&`, `\|`, `\;`, `\(` and `\)` are literal; `\{x}` is a literal `{x}`.

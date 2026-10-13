@@ -30,17 +30,16 @@ The server never waits: `/sh` finishes at once, and the rest of the chain runs o
 
 ## See and cancel waiting chains
 
-`jobs` lists your waiting chains with a number and the ticks left; `kill %N` cancels one.
+`jobs` lists your waiting chains with a number and the ticks left; `kill %N` cancels one. Here a timer starts in the
+background, is listed, and is cancelled before it fires — all in one line, so you don't have to be quick.
 
 **Give it a try!**
 
 ```text
-/sh sleep 5s ; echo too late
-/sh jobs
-/sh kill %1
+/sh (sleep 5s ; echo too late) & jobs ; kill %1
 ```
 
-`too late` never appears.
+You'll see the timer listed as `%1`, and `too late` never appears.
 
 ![A timer listed by jobs](../images/screens/jobs.png)
 

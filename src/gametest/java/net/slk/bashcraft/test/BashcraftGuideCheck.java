@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
+import net.slk.bashcraft.mc.ServerJobs;
 import net.slk.bashcraft.docs.GuideSnippets;
 
 import java.io.IOException;
@@ -31,6 +32,18 @@ public class BashcraftGuideCheck implements FabricClientGameTest {
     static void type(ClientGameTestContext context, TestServerContext server, String command) {
         context.runOnClient(client -> client.getConnection().sendCommand(command.substring(1)));
         context.waitTicks(5);
+        server.runOnServer(s -> {});
+        context.waitTicks(5);
+    }
+
+    /**
+     * A reader pastes the next line only after this one has finished: wait until no chain is waiting (at most 110 ticks,
+     * a little over the 100-tick sleep a snippet line may have; a timer that repeats never finishes).
+     */
+    static void settle(ClientGameTestContext context, TestServerContext server) {
+        for (int t = 0; t < 110 && server.computeOnServer(s -> ServerJobs.waiting()) > 0; t += 5) {
+            context.waitTicks(5);
+        }
         server.runOnServer(s -> {});
         context.waitTicks(5);
     }
@@ -72,11 +85,7 @@ public class BashcraftGuideCheck implements FabricClientGameTest {
                     ChatLog.clear();
                     for (String command : snippet.commands()) {
                         type(context, server, command);
-                    }
-                    if (snippet.sleeps()) {
-                        context.waitTicks(120);
-                        server.runOnServer(s -> {});
-                        context.waitTicks(5);
+                        settle(context, server);
                     }
                     List<String> red = ChatLog.red();
                     String where = snippet.file() + ":" + snippet.line();

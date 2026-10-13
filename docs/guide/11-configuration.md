@@ -5,7 +5,7 @@ first time; edit it and restart to change a setting.
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `transparentMode` | `true` | Chains typed without `/sh` (see [Chains without /sh](07-without-sh.md)). Function files pick up a change on `/reload`. |
+| `transparentMode` | `true` | Chains typed without `/sh` (see [Chains without /sh](07-without-sh.md)). |
 | `maxSegments` | `32` | Most commands in one chain, alias body or `$( … )`. |
 | `maxDepth` | `8` | How deep chains may nest inside chains (functions running `sh`, aliases calling aliases, `$( … )`). |
 | `maxTotalCommands` | `256` | Most commands one chain may run, counting every chain nested inside it. A player's waiting chains share this budget per second. |

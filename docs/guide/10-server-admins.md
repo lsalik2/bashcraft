@@ -11,9 +11,9 @@ if typed alone. A non-operator who writes `/sh op Steve` gets the same "unknown 
 
 ## Chat commands in typed chains
 
-When a player types `/sh`, the chat commands `msg`, `me`, `say` and `teammsg` are refused inside it. Their messages
-are normally signed by the player's client so that others can trust who wrote them — and the text inside a `/sh`
-line can't be signed that way.
+When a player types a chain — with `/sh` or without — the chat commands `msg`, `me`, `say` and `teammsg` are refused
+inside it. Their messages are normally signed by the player's client so that others can trust who wrote them, and the
+text inside a chain can't be signed that way. A plain `/say` on its own is unaffected.
 
 **Give it a try!**
 <!-- try: errors expected -->
@@ -59,7 +59,7 @@ Values put into a command that can run other commands — `sh …`, anything wit
 **Give it a try!**
 
 ```text
-/sh jobs
+/sh (sleep 3s ; echo done) & jobs
 ```
 
 ## Limits

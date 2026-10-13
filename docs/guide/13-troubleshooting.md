@@ -50,8 +50,9 @@ one.
 
 ## My chain is red in chat
 
-A plain Minecraft client colours anything after `&&` red, because it doesn't know BashCraft. The line still works.
-The [client companion](08-client-companion.md) colours it properly.
+Typed without `/sh`, a chain looks wrong to a plain Minecraft client, which colours everything after the first
+command red because it doesn't know BashCraft. The line still works. (`/sh` lines don't turn red: to a plain client
+everything after `/sh` is just text.) The [client companion](08-client-companion.md) colours both properly.
 
 ## Typed without `/sh`, my line didn't chain
 

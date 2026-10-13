@@ -9,7 +9,7 @@ Write `sh …` lines in a `.mcfunction` file — no slash, like every other func
 function carry on with its next line; the rest of that chain runs later.
 
 ```mcfunction
-sh tp @a ~ ~1 ~ && effect give @a minecraft:slow_falling 5
+sh execute as @a at @s run tp @s ~ ~1 ~ && effect give @a minecraft:slow_falling 5
 sh title @a title "Get ready" ; sleep 3s ; title @a title "Go!"
 say this runs straight after the line above starts its countdown
 ```
@@ -21,11 +21,13 @@ Put a chain in a command block's command, starting with `sh`.
 **Give it a try!**
 
 ```text
-/setblock ~2 ~ ~ minecraft:command_block{Command:"sh echo hi && echo from a command block"}
+/setblock ~2 ~ ~ minecraft:command_block{Command:'sh tellraw @p "hi" && tellraw @p "from a command block"'}
 /setblock ~2 ~1 ~ minecraft:redstone_block
+/execute if block ~2 ~ ~ minecraft:command_block{SuccessCount:1}
 ```
 
-The redstone block powers the command block, which runs the chain. With the
+The redstone block powers the command block, which runs the chain and says hello in your chat. The last line checks
+the block's `SuccessCount` — 1 when the chain worked, the same number comparators read. With the
 [client companion](08-client-companion.md), the command block screen colours chains as you type them:
 
 ![A chain in a command block](../images/screens/command-block.png)

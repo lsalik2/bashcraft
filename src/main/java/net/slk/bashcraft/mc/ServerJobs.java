@@ -64,6 +64,11 @@ public final class ServerJobs {
                 && waiting.saved().getEntity().getUUID().equals(player));
     }
 
+    /** How many chains are waiting (the docs' snippet test uses it to paste lines at a reader's pace). */
+    public static int waiting() {
+        return table.size();
+    }
+
     /** Jobs are never kept across a restart. */
     public static void clear() {
         table = newTable();

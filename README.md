@@ -15,6 +15,8 @@ timers — from chat, command blocks or functions, without anything new to insta
 - **Aliases** — name a chain and use it like a command, with arguments.
 - **Groups** — `( … )` bundles commands so an operator applies to all of them.
 
+Try them in a creative world with cheats on — `tp`, `locate` and `surface` need operator permission:
+
 **Give it a try!**
 
 ```text
@@ -74,13 +76,15 @@ off. Every setting is described in [Configuration](docs/guide/11-configuration.m
 
 ## Building
 
+Needs JDK 25 (point `JAVA_HOME` at it) and, for the brand images, Python 3.
+
 ```
-JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew build                # jar in build/libs
-JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew test                 # unit tests, including the docs checks
-JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew runClientGameTest    # in-game tests, every guide snippet included (headless on Xvfb if installed)
-JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew updateScreenshots    # re-capture docs/images/screens
-python3 branding/generate.py [--check]                           # render (or check) the brand images
-python3 -m unittest discover -s branding                         # branding tests
+./gradlew build                            # jar in build/libs
+./gradlew test                             # unit tests, including the docs checks
+./gradlew runClientGameTest                # in-game tests, every guide snippet included (headless on Xvfb if installed)
+./gradlew updateScreenshots                # re-capture docs/images/screens
+python3 branding/generate.py [--check]     # render (or check) the brand images
+python3 -m unittest discover -s branding   # branding tests
 ```
 
 ## License

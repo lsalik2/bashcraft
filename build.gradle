@@ -55,6 +55,13 @@ tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
 }
 
+// MIT asks for the notice in every copy: the jar carries LICENSE (Fabric's usual name for it).
+jar {
+	from("LICENSE") {
+		rename { "${it}_${project.base.archivesName.get()}" }
+	}
+}
+
 java {
 	withSourcesJar()
 	sourceCompatibility = JavaVersion.VERSION_25

@@ -42,10 +42,10 @@ Without a `/` after it, `;`, `&&` or `|` is just text. That keeps ordinary messa
 **Give it a try!**
 
 ```text
-/tellraw @s "lunch; then work"
+/say lunch; then work
 ```
 
-That's one command: nothing after the `;` starts with `/`.
+That's one ordinary `/say`: nothing after the `;` starts with `/`, so it isn't a chain.
 
 ## Rules and limits
 
@@ -58,8 +58,8 @@ That's one command: nothing after the `;` starts with `/`.
 - `&` (background) also needs a `/` after it here, like the other operators.
 - Macro lines in functions (`$…`) are never treated as chains, because a macro value could otherwise add commands to
   the line.
-- Set `transparentMode` to `false` in the [configuration](11-configuration.md) to turn this off (function files pick
-  up the change on `/reload`). `/sh` always works.
+- Set `transparentMode` to `false` in the [configuration](11-configuration.md) to turn this off; like every setting,
+  it takes effect after a restart. `/sh` always works.
 
 ---
 
