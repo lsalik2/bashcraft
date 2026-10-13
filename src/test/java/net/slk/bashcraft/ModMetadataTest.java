@@ -64,4 +64,15 @@ class ModMetadataTest {
         assertTrue(license.contains("Copyright (c) 2026 lsalik2"));
         assertTrue(license.contains(NOTICE), "the Mojang notice");
     }
+
+    @Test
+    void versionMatchesChangelogAndListing() throws IOException {
+        String version = version();
+        assertTrue(Files.readString(Path.of("CHANGELOG.md")).contains("## " + version), "CHANGELOG has a " + version + " entry");
+        String listing = Files.readString(Path.of("docs/publishing/listing.md"));
+        assertTrue(listing.contains("Version: " + version), "the listing names " + version);
+        assertTrue(listing.contains(SUMMARY), "the listing has the summary");
+        assertTrue(Files.readString(Path.of("README.md")).contains(SUMMARY), "the README has the summary");
+        assertTrue(Files.readString(Path.of("README.md")).contains("Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft."));
+    }
 }
