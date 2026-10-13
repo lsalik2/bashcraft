@@ -29,11 +29,13 @@ Recognised (like other builtins) on a command's raw text, inside chains and `/sh
 |---|---|
 | `alias NAME = BODY` | define/replace a personal alias |
 | `alias global.NAME = BODY` | define/replace a global alias (game-master permission) |
-| `unalias NAME` / `unalias global.NAME` | remove (personal / global; global needs game-master permission) |
+| `unalias NAME` / `unalias global.NAME` | remove (personal / global; global needs game-master permission); a missing one fails with `no alias NAME` / `no alias global.NAME`, a missing name with `unalias needs NAME` (added after review) |
 | `alias` | list: output is one item per alias, `NAME = BODY` (personal first, then `global.NAME = BODY`); pipeable |
 
 - `BODY` is the rest of the command after `=`, with one surrounding pair of matching quotes removed. It is **never
-  expanded** at definition and must parse as a chain (`NodeParser` SH mode), else `[n] alias body: <parse error>`.
+  expanded** at definition and must parse as a chain (`NodeParser` SH mode) of at most `maxSegments` commands, else
+  `[n] alias body: <parse error>`; a body stored before that limit fails when called with `alias NAME: <parse error>`
+  (added after review).
 - `NAME` = `[a-z_][a-z0-9_-]{0,31}`. Refused if it is a registered command (a root literal of the server's
   dispatcher) or a BashCraft builtin word (`alias unalias echo unset grep store each surface history sh`):
   `[n] alias name NAME is already a command`.
@@ -64,7 +66,8 @@ Recognised (like other builtins) on a command's raw text, inside chains and `/sh
 - Recorded: every `/sh` line and transparent chain the player types themselves, as it ran (after `!` resolution).
   Not recorded: lines from functions, command blocks, the console, `execute as`.
 - `/sh !!` reruns the last line; `/sh !PREFIX` reruns the most recent line starting with `PREFIX`. Only as a whole
-  `/sh` line. No match: `BashCraft: no history matching PREFIX`.
+  `/sh` line. No match: `BashCraft: no history matching PREFIX`. `/sh !` alone: `BashCraft: ! needs a prefix (!!
+  reruns your last line)` (added after review).
 - `history` builtin: one item per line, most recent last (pipeable).
 - In an elevated chain, `!…` and `history` fail with `history is only for chains you type`.
 

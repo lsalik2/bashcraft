@@ -44,12 +44,13 @@
 ## 3. `&`
 
 - `X & Y` runs `X`; if `X` pauses, the rest of `X` becomes its own job and `Y` runs at once. If `X` finishes
-  without pausing, `Y` runs next as after `;`. The status after `&` is success (as in bash).
+  without pausing, `Y` runs next as after `;`. The status after `&` is success (as in bash), with a result above 0;
+  an `X` that didn't pause passes its output and value on, so `(echo hi &) | grep hi` works (added after review).
 - Precedence is bash's: `&` closes the `&&`/`||` list before it, like `;`. `a && b & c` backgrounds `a && b`;
   `a ; b & c` backgrounds only `b`; `a | b & c` backgrounds the pipeline. A trailing `&` is allowed (`… & `, and
   before `)`).
 - **`/sh`:** every unquoted lone `&` is an operator now. `\&` or quotes keep it as text (`say Tom \& Jerry`).
-  `&&` is unchanged, and `\&&` still means a literal `&&`. `& x`, `a & & b`, `a & ; b` are syntax errors
+  `&&` is unchanged, and `\&&` still means a literal `&&`; `\&&&` is `\&` then `&&`, as before (added after review). `& x`, `a & & b`, `a & ; b` are syntax errors
   (`unexpected '&'`, `unexpected ';'`).
 - **Transparent mode:** `&` counts only when the next non-space character is `/` (directly or after `(`), like the
   other operators; `/say Tom & Jerry` and a trailing `&` stay text.
@@ -60,7 +61,8 @@
   `%N  <ticks left>t  <text>` — e.g. `%1  40t  echo hi ; sleep 40 ; echo bye`. Operators (game-master permission)
   see every job, with its owner: `%2  1180t  Steve: sleep 1200 ; title @s title "time's up"`.
 - A job's text is the chain it belongs to, written back as `/sh` syntax: the whole chain for a pause outside `&`,
-  the backgrounded part for `X &`. An alias timer shows the line that called it (`tick`).
+  the backgrounded part for `X &`. An alias timer shows the line that called it (`tick`). Where the append rule
+  gave a command ` $@`, the job text shows the words instead (added after review).
 - `kill %N…` cancels jobs. It is the builtin only when its first argument starts with `%`; any other `kill` is
   vanilla's. Players may cancel their own jobs; operators any. A job that doesn't exist or isn't the caller's:
   `[n] no job %N`. Outcome: success when every named job was cancelled; result = how many were.
