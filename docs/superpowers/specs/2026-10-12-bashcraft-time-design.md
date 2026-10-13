@@ -120,6 +120,7 @@ tick, then number.
 | `maxSleepTicks` | 72000 | one sleep |
 | `maxJobsPerPlayer` | 8 | waiting chains a player typed |
 | `maxJobs` | 64 | all waiting chains |
+| `maxServerJobs` | 32 | the server's jobs together, so players keep the rest (added after review) |
 | `maxTotalCommands` (existing) | 256 | commands per second for a player's waiting chains together; per wake for the server's |
 
 A job belongs to the player who typed its chain; any other job (command block, function, console, `execute as`)

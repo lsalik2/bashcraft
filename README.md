@@ -177,7 +177,8 @@ also inside `/sh …` lines and in command blocks. On servers without BashCraft 
 `config/bashcraft.json`: `maxSegments` (32), `maxDepth` (8), `maxTotalCommands` (256, across nested chains),
 `swallowPipedOutput` (true),
 `transparentMode` (true), `maxSleepTicks` (72000, one hour), `maxJobsPerPlayer` (8), `maxJobs` (64, waiting chains
-on the whole server).
+on the whole server), `maxServerJobs` (32, the share of those that command blocks,
+functions, the console and `execute as` may hold).
 
 ## Building
 
