@@ -996,4 +996,13 @@ class ChainExecutorTest {
         ExecResult counted = run(new FakeRunner().on("count", new ExecResult(true, 5, List.of())), "count &");
         assertEquals(5, counted.result(), "a body that succeeded keeps its result");
     }
+
+    @Test
+    void substitutionsFollowTheSegmentLimit() throws Exception {
+        FakeRunner r = new FakeRunner();
+        ChainExecutor limited = new ChainExecutor(r, ShellContext.of(table()), true, Integer.MAX_VALUE, 8, 2);
+        limited.execute(NodeParser.parse("say $(a ; b ; c)", NodeParser.Mode.SH, 32));
+        assertEquals(List.of("$(…): too many commands (max 2) at col 9"), r.errors);
+        assertEquals(List.of(), r.ran);
+    }
 }

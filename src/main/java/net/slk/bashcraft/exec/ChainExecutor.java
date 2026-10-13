@@ -57,7 +57,7 @@ public final class ChainExecutor {
     /**
      * @param maxTotalCommands budget shared by this chain and every chain nested inside it (see {@link DepthGuard#spend})
      * @param maxDepth         nesting limit for {@code $( … )}, aliases and nested {@code sh}
-     * @param maxSegments      most commands in an alias body, as in any chain
+     * @param maxSegments      most commands in an alias body or {@code $( … )}, as in any chain
      */
     public ChainExecutor(CommandRunner runner, ShellContext context, boolean swallowPipedOutput, int maxTotalCommands, int maxDepth,
                          int maxSegments) {
@@ -691,7 +691,7 @@ public final class ChainExecutor {
             try (DepthGuard.Scope ignored = scope.get()) {
                 Node node;
                 try {
-                    node = NodeParser.parse(chain, NodeParser.Mode.SH, Integer.MAX_VALUE);
+                    node = NodeParser.parse(chain, NodeParser.Mode.SH, maxSegments);
                 } catch (ChainSyntaxException e) {
                     throw new ExpansionException("$(…): " + e.getMessage());
                 }
