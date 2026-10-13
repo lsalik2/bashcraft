@@ -11,6 +11,10 @@ import java.util.Optional;
 public final class Sources {
     private Sources() {}
 
+    /**
+     * The player whose own command packet this chain came from: not the console running {@code execute as @p}, and not
+     * a function or advancement reward the player runs (those keep the player's source but always suppress output).
+     */
     public static Optional<ServerPlayer> typist(CommandSourceStack source) {
         if (!(source.getEntity() instanceof ServerPlayer player) || source.isSilent()) {
             return Optional.empty();

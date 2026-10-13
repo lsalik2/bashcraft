@@ -18,6 +18,12 @@ public class BashcraftAliasCheck implements FabricClientGameTest {
             TestServerContext server = singleplayer.getServer();
             server.runCommand("fill 0 120 16 12 120 16 minecraft:air");
 
+            // Before any global alias exists: a non-op's refused global alias leaves no empty set behind.
+            context.runOnClient(client -> client.getConnection().sendCommand("sh alias global.g = say no"));
+            context.waitTicks(5);
+            server.runCommand("execute if data storage bashcraft:aliases global run setblock 10 120 16 minecraft:stone");
+            check(!stone(server, 10), "a global alias change that fails leaves nothing in storage");
+
             server.runCommand("sh alias global.mark = setblock $1 120 16 minecraft:stone");
             server.runCommand("sh mark 2");
             check(stone(server, 2), "a global alias with an argument");

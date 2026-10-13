@@ -94,10 +94,6 @@ public final class MinecraftCommandRunner implements CommandRunner {
         invoker.sendFailure(Component.literal("BashCraft: " + message));
     }
 
-    /**
-     * The chain came from a player's own command packet: not the console running {@code execute as @p}, and not a
-     * function or advancement reward the player runs (those keep the player's source but always suppress output).
-     */
     private static String prefix(RunOptions options) {
         return options.failurePrefix() == null ? "" : options.failurePrefix();
     }
