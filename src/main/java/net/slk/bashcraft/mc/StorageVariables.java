@@ -61,15 +61,22 @@ public final class StorageVariables implements Variables {
     @Override
     public void set(Scope scope, String name, String value) throws ExpansionException {
         CompoundTag root = storage.get(ID);
-        table(root, true).set(scope, name, value);
-        save(root);
+        try {
+            table(root, true).set(scope, name, value);
+        } finally {
+            // Also after a refusal: table() attached the sets to the live tag, and empty ones must not stay.
+            save(root);
+        }
     }
 
     @Override
     public void unset(Scope scope, String name) throws ExpansionException {
         CompoundTag root = storage.get(ID);
-        table(root, true).unset(scope, name);
-        save(root);
+        try {
+            table(root, true).unset(scope, name);
+        } finally {
+            save(root);
+        }
     }
 
     /**
@@ -86,8 +93,9 @@ public final class StorageVariables implements Variables {
         return new VariableTable(new TagStrings(mine), globalSet, preferMine, globalWritable);
     }
 
-    /** Drops this player's set once it is empty, so storage doesn't keep a compound per player forever. */
+    /** Drops empty sets (this player's, the global one), so storage doesn't keep a compound per player forever. */
     private void save(CompoundTag root) {
+        root.getCompound("global").filter(CompoundTag::isEmpty).ifPresent(empty -> root.remove("global"));
         if (player != null) {
             root.getCompound("players").ifPresent(players -> {
                 if (players.getCompoundOrEmpty(player).isEmpty()) {

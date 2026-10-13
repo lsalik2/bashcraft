@@ -23,6 +23,12 @@ public class BashcraftVariableCheck implements FabricClientGameTest {
             check(stone(server, 1, 10), "an assignment is visible to the next command");
             server.runCommand("sh setblock $global.x 120 11 minecraft:stone");
             check(stone(server, 1, 11), "variables persist to the next line; the console writes the global set");
+
+            // Storage exists now (a missing id reads as a detached tag): a non-op's refused write leaves no empty player set.
+            context.runOnClient(client -> client.getConnection().sendCommand("sh global.g=1"));
+            context.waitTicks(5);
+            server.runCommand("execute if data storage bashcraft:vars players run setblock 10 120 10 minecraft:stone");
+            check(!stone(server, 10, 10), "a variable write that fails leaves nothing in storage");
             server.runCommand("function bashcraft-test:read_global");
             check(stone(server, 6, 10), "datapacks read the global set from command storage");
 
