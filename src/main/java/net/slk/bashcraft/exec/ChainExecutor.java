@@ -186,24 +186,31 @@ public final class ChainExecutor {
 
     /**
      * One run's settings and {@code $?}, shared by the frames it leaves: command numbers, whether errors are numbered,
-     * the alias arguments in force ({@code null} outside an alias) and how many alias levels deep it is.
+     * the alias arguments in force ({@code null} outside an alias), how many alias levels deep it is, and the command
+     * the append rule gave {@code " $@"} ({@code null} if none), so job text can show the words instead.
      */
     static final class RunState {
         final Map<Node.Command, Integer> numbers;
         final boolean numbered;
         final Arguments positionals;
         final int level;
+        final Node.Command appended;
         int lastStatus;
 
         RunState(Map<Node.Command, Integer> numbers, boolean numbered, Arguments positionals, int level) {
+            this(numbers, numbered, positionals, level, null);
+        }
+
+        RunState(Map<Node.Command, Integer> numbers, boolean numbered, Arguments positionals, int level, Node.Command appended) {
             this.numbers = numbers;
             this.numbered = numbered;
             this.positionals = positionals;
             this.level = level;
+            this.appended = appended;
         }
 
         RunState atLevel(int other) {
-            RunState copy = new RunState(numbers, numbered, positionals, other);
+            RunState copy = new RunState(numbers, numbered, positionals, other, appended);
             copy.lastStatus = lastStatus;
             return copy;
         }
@@ -231,7 +238,29 @@ public final class ChainExecutor {
         }
     }
 
-    /** A value piped into a node and the producing command's numeric result ({result}). */
+    /** The rightmost command, the one the append rule gives {@code " $@"}. */
+    private static Node.Command lastCommand(Node node) {
+        return switch (node) {
+            case Node.Command command -> command;
+            case Node.Pipeline pipeline -> lastCommand(pipeline.stages().getLast());
+            case Node.Sequence sequence -> lastCommand(sequence.items().getLast());
+            case Node.Group group -> lastCommand(group.body());
+            case Node.Background background -> lastCommand(background.body());
+        };
+    }
+
+    /** The node with {@code target} (by identity) replaced by {@code replacement}. */
+    private static Node replace(Node node, Node.Command target, Node.Command replacement) {
+        return switch (node) {
+            case Node.Command command -> command == target ? replacement : command;
+            case Node.Pipeline pipeline -> new Node.Pipeline(pipeline.stages().stream().map(stage -> replace(stage, target, replacement)).toList());
+            case Node.Sequence sequence -> new Node.Sequence(sequence.items().stream().map(item -> replace(item, target, replacement)).toList(),
+                    sequence.joins());
+            case Node.Group group -> new Node.Group(replace(group.body(), target, replacement));
+            case Node.Background background -> new Node.Background(replace(background.body(), target, replacement));
+        };
+    }
+
     /** A value piped into a node, the producing command's numeric result ({result}), and the items grep/each work on. */
     private record Piped(PipeValue value, int result, List<String> items) {}
 
@@ -330,12 +359,22 @@ public final class ChainExecutor {
                 return new Outcome(new ExecResult(true, false, ran.result(), ran.output(), ran.value()), body.lastCommand());
             }
             try {
-                context.jobs().queue(new Continuation(detached(halt.frames())), halt.delay(), ChainFormatter.toSh(background.body()));
+                context.jobs().queue(new Continuation(detached(halt.frames())), halt.delay(), ChainFormatter.toSh(shown(background.body())));
             } catch (ExpansionException e) {
                 runner.reportError(halt.label() + e.getMessage());
                 return new Outcome(ExecResult.failure(), body.lastCommand(), Halt.stop());
             }
             return new Outcome(new ExecResult(true, 1, List.of()), body.lastCommand());
+        }
+
+        /** A part of this run as job text: the words the append rule passes on rather than its {@code " $@"}. */
+        private Node shown(Node node) {
+            if (state.appended == null) {
+                return node;
+            }
+            String text = state.appended.text();
+            String written = text.substring(0, text.length() - " $@".length());
+            return replace(node, state.appended, new Node.Command(written + " " + String.join(" ", state.positionals.words())));
         }
 
         private Outcome pipeline(Node.Pipeline pipeline, Piped input, boolean feedsPipe) {
@@ -701,8 +740,10 @@ public final class ChainExecutor {
                 runner.reportError(label(command) + "alias " + name + ": " + e.getMessage());
                 return new Outcome(ExecResult.failure(), command.text());
             }
+            Node.Command appended = null;
             if (!words.words().isEmpty() && !Expander.hasPositionals(body)) {
                 node = appendArguments(node);
+                appended = lastCommand(node);
             }
             Optional<DepthGuard.Scope> scope = DepthGuard.enter(maxDepth);
             if (scope.isEmpty()) {
@@ -718,7 +759,7 @@ public final class ChainExecutor {
                 Map<Node.Command, Integer> innerNumbers = new IdentityHashMap<>();
                 number(node, innerNumbers);
                 // Inside a pipe, $( … ) or each, the body can't pause either.
-                return new Run(new RunState(innerNumbers, false, words, state.level + 1), noPause)
+                return new Run(new RunState(innerNumbers, false, words, state.level + 1, appended), noPause)
                         .node(node, placesInput ? null : input, feedsPipe);
             }
         }

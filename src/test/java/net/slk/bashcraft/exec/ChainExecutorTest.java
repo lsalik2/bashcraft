@@ -978,4 +978,14 @@ class ChainExecutorTest {
         FakeRunner f = new FakeRunner().on("fail", FAIL);
         assertTrue(run(f, "fail &").success(), "the status after & is still success");
     }
+
+    @Test
+    void jobTextShowsAliasWordsNotTheAppendedPlaceholder() throws Exception {
+        FakeRunner r = new FakeRunner();
+        FakeJobs jobs = new FakeJobs();
+        start(r, jobs, "alias later = '(sleep 2 ; say done) &' ; later now");
+        assertEquals(List.of("(sleep 2 ; say done now)"), jobs.queued.stream().map(FakeJobs.Queued::text).toList());
+        timed(r, jobs, 8).resume(jobs.queued.getFirst().continuation());
+        assertEquals(List.of("say done now"), r.ran);
+    }
 }
