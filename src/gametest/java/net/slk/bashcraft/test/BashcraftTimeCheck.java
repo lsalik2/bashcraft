@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Blocks;
+import net.slk.bashcraft.mc.ServerJobs;
 
 import static net.slk.bashcraft.test.Checks.check;
 
@@ -18,12 +19,20 @@ public class BashcraftTimeCheck implements FabricClientGameTest {
     public void runTest(ClientGameTestContext context) {
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
             TestServerContext server = singleplayer.getServer();
-            server.runCommand("fill 0 120 20 20 120 20 minecraft:air");
+            server.runCommand("fill 0 120 20 30 120 20 minecraft:air");
 
             server.runCommand("sh setblock 0 120 20 minecraft:stone ; sleep 20 ; setblock 1 120 20 minecraft:stone");
             check(stone(server, 0) && !stone(server, 1), "a chain pauses at sleep");
             context.waitTicks(25);
             check(stone(server, 1), "the rest of the chain runs after the sleep");
+
+            server.runCommand("sh sleep 20 & jobs | grep -x %1  20t  Server: sleep 20 && setblock 21 120 20 minecraft:stone");
+            check(stone(server, 21), "jobs lists the number, the ticks left, the owner and the chain");
+            // That job is %1 for 20 ticks, so this one is %2: it cancels itself, finishes this wake and doesn't wait again.
+            server.runCommand("sh sleep 5 ; kill %2 ; setblock 22 120 20 minecraft:stone ; sleep 5 ; setblock 23 120 20 minecraft:stone");
+            context.waitTicks(15);
+            check(stone(server, 22) && !stone(server, 23), "a job that cancels itself ends at its next sleep");
+            context.waitTicks(10);
 
             server.runCommand("sh (sleep 10 ; setblock 3 120 20 minecraft:stone) & setblock 2 120 20 minecraft:stone");
             check(stone(server, 2) && !stone(server, 3), "& runs what follows at once");
@@ -70,6 +79,19 @@ public class BashcraftTimeCheck implements FabricClientGameTest {
             server.runCommand("execute if score @p t1 matches 3 run setblock 8 120 20 minecraft:stone");
             check(stone(server, 8), "a player's chain resumes as that player");
             check(stone(server, 7), "a player can't cancel another's job");
+
+            // A player leaving ends the chains they typed and those that run as them.
+            context.runOnClient(client -> client.getConnection().sendCommand("sh sleep 100 ; echo typed-job"));
+            context.waitTicks(3);
+            server.runCommand("execute as @p run sh sleep 100 ; say as-player");
+            server.runCommand("sh jobs | grep typed-job && setblock 24 120 20 minecraft:stone");
+            server.runCommand("sh jobs | grep as-player && setblock 25 120 20 minecraft:stone");
+            check(stone(server, 24) && stone(server, 25), "both chains wait as jobs");
+            server.runOnServer(s -> ServerJobs.forget(player(s).getUUID()));
+            server.runCommand("sh jobs | grep typed-job && setblock 26 120 20 minecraft:stone");
+            server.runCommand("sh jobs | grep as-player && setblock 27 120 20 minecraft:stone");
+            check(!stone(server, 26), "a player's typed chains end when they leave");
+            check(!stone(server, 27), "chains that run as a player end when they leave");
 
             // A player's waiting chains share one command budget per second: a timer that runs too much ends.
             context.runOnClient(client -> client.getConnection().sendCommand(
