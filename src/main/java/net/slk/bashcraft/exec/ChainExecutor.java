@@ -314,22 +314,27 @@ public final class ChainExecutor {
             return finish(new ExecResult(true, false, ticks, List.of()), command).halted(Halt.pause(ticks, label(command)));
         }
 
-        /** body &: if the body pauses, its waiting part becomes a job of its own and the chain carries on (spec C3 §3). */
+        /**
+         * body &: if the body pauses, its waiting part becomes a job of its own and the chain carries on (spec C3 §3).
+         * The status after it is success, as in bash; a body that didn't wait passes its output and value on.
+         */
         private Outcome background(Node.Background background, Piped input, boolean feedsPipe) {
             Outcome body = node(background.body(), input, feedsPipe);
             Halt halt = body.halt();
             if (halt != null && halt.stopped()) {
                 return body;
             }
-            if (halt != null) {
-                try {
-                    context.jobs().queue(new Continuation(detached(halt.frames())), halt.delay(), ChainFormatter.toSh(background.body()));
-                } catch (ExpansionException e) {
-                    runner.reportError(halt.label() + e.getMessage());
-                    return new Outcome(ExecResult.failure(), body.lastCommand(), Halt.stop());
-                }
-            }
             state.lastStatus = 0;
+            if (halt == null) {
+                ExecResult ran = body.result();
+                return new Outcome(new ExecResult(true, false, ran.result(), ran.output(), ran.value()), body.lastCommand());
+            }
+            try {
+                context.jobs().queue(new Continuation(detached(halt.frames())), halt.delay(), ChainFormatter.toSh(background.body()));
+            } catch (ExpansionException e) {
+                runner.reportError(halt.label() + e.getMessage());
+                return new Outcome(ExecResult.failure(), body.lastCommand(), Halt.stop());
+            }
             return new Outcome(new ExecResult(true, 1, List.of()), body.lastCommand());
         }
 

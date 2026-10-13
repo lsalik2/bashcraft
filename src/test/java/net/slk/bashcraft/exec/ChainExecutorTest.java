@@ -966,4 +966,16 @@ class ChainExecutorTest {
         assertEquals(List.of(), r.ran);
         assertEquals(Optional.of("a ; b"), aliases.body("fits"));
     }
+
+    @Test
+    void backgroundPassesOutputOnWhenItDoesNotWait() throws Exception {
+        FakeRunner r = new FakeRunner();
+        assertTrue(run(r, "(echo hi &) | grep hi").success(), r.errors.toString());
+        assertTrue(r.errors.isEmpty(), r.errors.toString());
+        FakeRunner s = new FakeRunner();
+        run(s, "say $(echo hi &)");
+        assertEquals(List.of("say hi"), s.ran, s.errors.toString());
+        FakeRunner f = new FakeRunner().on("fail", FAIL);
+        assertTrue(run(f, "fail &").success(), "the status after & is still success");
+    }
 }
