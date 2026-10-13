@@ -13,11 +13,12 @@ from draw import Font  # noqa: E402
 from jar import Assets, find_jar  # noqa: E402
 from png import decode, encode, upscale  # noqa: E402
 
-# SHA-256 of each image's logical pixels (RGBA, row by row), taken from the renders approved on 2026-10-13.
+# SHA-256 of each image's logical pixels (RGBA, row by row), taken from the renders approved on 2026-10-13
+# (and the featured book's middle recipe later changed from "Feed everyone" to "Who's online").
 APPROVED = {
     "icon": ("0ab1a944f1f0ebfbc84ec67bbf051b02d2f8b999b434af886b0e4a0388dd40da", 48, 48),
     "banner": ("e4f989d63ed685dfe188f071b1695622f90c55e3c6e5ddaa9857cda8dd5664a8", 480, 192),
-    "featured": ("532b11a01e2afa675d9c65e8a76ad65783ad73248bdc258f3182b328f4aa62ab", 512, 288),
+    "featured": ("b95178795357fbb8ea4479735ac2a47b5aa076e723a42a0c79c8000241a76353", 512, 288),
     "gallery_cave": ("75dd9e5f513e068513a09db839b3067287fca85bdbd646bbf322a3568e4e7e52", 512, 288),
 }
 

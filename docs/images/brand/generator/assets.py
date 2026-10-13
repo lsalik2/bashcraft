@@ -13,7 +13,7 @@ BANNER_ORES = {(0, 0): "coal_ore", (5, 0): "iron_ore", (6, 0): "copper_ore", (4,
 GALLERY_ORES = {(1, 0): "coal_ore", (7, 1): "coal_ore", (0, 2): "copper_ore", (2, 2): "iron_ore", (1, 3): "iron_ore",
                 (4, 3): "gold_ore", (2, 4): "diamond_ore", (4, 4): "redstone_ore"}
 BOOK_LINES = [("Village trip", HEADING), ("locate structure", None), ("  #village |", None), ("surface | tp @s", None),
-              ("", None), ("Feed everyone", HEADING), ("list | each give", None), ("  {value} bread 3", None),
+              ("", None), ("Who's online", HEADING), ("list | each echo", None), ("  {value} is here", None),
               ("", None), ("Quick home", HEADING), ("alias home =", None), ("  tp @s 0 80 0", None)]
 
 
