@@ -104,7 +104,7 @@ public final class ServerJobs {
                     Sources.typist(source).map(HistoryBook::of).orElse(null), jobs);
             try {
                 new ChainExecutor(new MinecraftCommandRunner(source), shell, config.swallowPipedOutput, config.maxTotalCommands,
-                        config.maxDepth).resume(waiting.continuation());
+                        config.maxDepth, config.maxSegments).resume(waiting.continuation());
             } finally {
                 table.setBudgetSpent(owner, DepthGuard.spent());
             }

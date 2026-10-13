@@ -95,7 +95,7 @@ public final class ShCommand {
             ShellContext shell = new ShellContext(StorageVariables.of(source), StorageAliases.of(source),
                     Sources.typist(source).map(HistoryBook::of).orElse(null), ServerJobs.forSource(source));
             return new ChainExecutor(new MinecraftCommandRunner(source), shell,
-                    config.swallowPipedOutput, config.maxTotalCommands, config.maxDepth).execute(chain);
+                    config.swallowPipedOutput, config.maxTotalCommands, config.maxDepth, config.maxSegments).execute(chain);
         }
     }
 }

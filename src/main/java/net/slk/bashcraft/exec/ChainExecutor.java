@@ -36,6 +36,7 @@ public final class ChainExecutor {
     private final boolean swallowPipedOutput;
     private final int maxTotalCommands;
     private final int maxDepth;
+    private final int maxSegments;
 
     public ChainExecutor(CommandRunner runner, boolean swallowPipedOutput) {
         this(runner, Variables.NONE, swallowPipedOutput, Integer.MAX_VALUE, Integer.MAX_VALUE);
@@ -49,17 +50,24 @@ public final class ChainExecutor {
         this(runner, ShellContext.of(variables), swallowPipedOutput, maxTotalCommands, maxDepth);
     }
 
+    public ChainExecutor(CommandRunner runner, ShellContext context, boolean swallowPipedOutput, int maxTotalCommands, int maxDepth) {
+        this(runner, context, swallowPipedOutput, maxTotalCommands, maxDepth, Integer.MAX_VALUE);
+    }
+
     /**
      * @param maxTotalCommands budget shared by this chain and every chain nested inside it (see {@link DepthGuard#spend})
      * @param maxDepth         nesting limit for {@code $( … )}, aliases and nested {@code sh}
+     * @param maxSegments      most commands in an alias body, as in any chain
      */
-    public ChainExecutor(CommandRunner runner, ShellContext context, boolean swallowPipedOutput, int maxTotalCommands, int maxDepth) {
+    public ChainExecutor(CommandRunner runner, ShellContext context, boolean swallowPipedOutput, int maxTotalCommands, int maxDepth,
+                         int maxSegments) {
         this.runner = runner;
         this.context = context;
         this.variables = context.variables();
         this.swallowPipedOutput = swallowPipedOutput;
         this.maxTotalCommands = maxTotalCommands;
         this.maxDepth = maxDepth;
+        this.maxSegments = maxSegments;
     }
 
     /** [n] numbers commands left to right as written, whether or not they run. */
@@ -683,7 +691,7 @@ public final class ChainExecutor {
             }
             Node node;
             try {
-                node = NodeParser.parse(body, NodeParser.Mode.SH, Integer.MAX_VALUE);
+                node = NodeParser.parse(body, NodeParser.Mode.SH, maxSegments);
             } catch (ChainSyntaxException e) {
                 runner.reportError(label(command) + "alias " + name + ": " + e.getMessage());
                 return new Outcome(ExecResult.failure(), command.text());
@@ -742,7 +750,7 @@ public final class ChainExecutor {
             }
             String body = Builtins.unquote(m.group(3).strip());
             try {
-                NodeParser.parse(body, NodeParser.Mode.SH, Integer.MAX_VALUE);
+                NodeParser.parse(body, NodeParser.Mode.SH, maxSegments);
             } catch (ChainSyntaxException e) {
                 runner.reportError(label(command) + "alias body: " + e.getMessage());
                 return ExecResult.failure();

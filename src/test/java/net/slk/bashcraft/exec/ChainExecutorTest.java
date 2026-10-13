@@ -953,4 +953,17 @@ class ChainExecutorTest {
         run(r, typedShell(aliases(), null), "unalias nope ; unalias ; unalias global.", 8);
         assertEquals(List.of("[1] no alias nope", "[2] unalias needs NAME", "[3] unalias needs NAME"), r.errors);
     }
+
+    @Test
+    void aliasBodiesFollowTheSegmentLimit() throws Exception {
+        FakeRunner r = new FakeRunner();
+        AliasTable aliases = aliases();
+        aliases.define(false, "big", "a ; b ; c");
+        ChainExecutor limited = new ChainExecutor(r, new ShellContext(table(), aliases, null), true, Integer.MAX_VALUE, 8, 2);
+        limited.execute(NodeParser.parse("alias small = 'a ; b ; c' ; big ; alias fits = 'a ; b'", NodeParser.Mode.SH, 32));
+        assertEquals(List.of("[1] alias body: too many commands (max 2) at col 9", "[2] alias big: too many commands (max 2) at col 9"),
+                r.errors, "a body stored before the limit applied fails when called");
+        assertEquals(List.of(), r.ran);
+        assertEquals(Optional.of("a ; b"), aliases.body("fits"));
+    }
 }
