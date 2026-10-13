@@ -95,8 +95,8 @@ final class Tokenizer {
                 i = close + 1;
                 continue;
             }
-            if (c == '\\' && input.startsWith("&&", i + 1)) {
-                // \&& has always meant a literal && (from before a lone & was an operator).
+            if (c == '\\' && input.startsWith("&&", i + 1) && !input.startsWith("&&&", i + 1)) {
+                // \&& has always meant a literal && (from before a lone & was an operator); \&&& is still \& then &&.
                 appendText("&&", i, i + 3);
                 i += 3;
                 continue;

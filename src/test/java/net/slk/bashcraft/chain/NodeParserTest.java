@@ -304,4 +304,9 @@ class NodeParserTest {
         assertEquals(cmd("say Tom & Jerry"), NodeParser.parse("/say Tom & Jerry", TRANSPARENT, 32));
         assertEquals(cmd("say hi &"), NodeParser.parse("/say hi &", TRANSPARENT, 32));
     }
+
+    @Test
+    void escapedAmpersandBeforeAndIsLiteral() throws Exception {
+        assertEquals(new Node.Sequence(List.of(cmd("say a &"), cmd("b")), List.of(Operator.AND)), sh("say a \\&&& b"));
+    }
 }
