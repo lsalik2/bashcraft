@@ -20,6 +20,12 @@ fabricApi {
 	}
 }
 
+// One parser for the docs' "Give it a try!" snippets, used by the unit tests and the in-game snippet test.
+sourceSets {
+	test { java { srcDir "src/docs/java" } }
+	gametest { java { srcDir "src/docs/java" } }
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
