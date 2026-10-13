@@ -51,16 +51,23 @@ public final class StorageAliases implements Aliases {
     @Override
     public void define(boolean global, String name, String body) throws ExpansionException {
         CompoundTag root = storage.get(ID);
-        table(root, true).define(global, name, body);
-        save(root);
+        try {
+            table(root, true).define(global, name, body);
+        } finally {
+            // Also after a refusal: table() attached the sets to the live tag, and empty ones must not stay.
+            save(root);
+        }
         AliasSync.changed(server, global ? null : typist);
     }
 
     @Override
     public void remove(boolean global, String name) throws ExpansionException {
         CompoundTag root = storage.get(ID);
-        table(root, true).remove(global, name);
-        save(root);
+        try {
+            table(root, true).remove(global, name);
+        } finally {
+            save(root);
+        }
         AliasSync.changed(server, global ? null : typist);
     }
 
@@ -92,8 +99,9 @@ public final class StorageAliases implements Aliases {
         return new AliasTable(new TagStrings(mine), globalSet, true, globalWritable, isCommand);
     }
 
-    /** Drops this player's set once it is empty, so storage doesn't keep a compound per player forever. */
+    /** Drops empty sets (this player's, the global one), so storage doesn't keep a compound per player forever. */
     private void save(CompoundTag root) {
+        root.getCompound("global").filter(CompoundTag::isEmpty).ifPresent(empty -> root.remove("global"));
         if (typist != null) {
             String key = typist.getUUID().toString();
             root.getCompound("players").ifPresent(players -> {

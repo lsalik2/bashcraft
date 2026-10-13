@@ -28,6 +28,12 @@ public class BashcraftAliasCheck implements FabricClientGameTest {
             check(stone(server, 7), "an alias can't be named after a command");
 
             // Typed by the (non-op) test player.
+            context.runOnClient(client -> client.getConnection().sendCommand("sh alias tp = say no"));
+            context.runOnClient(client -> client.getConnection().sendCommand("sh unalias nope"));
+            context.waitTicks(5);
+            server.runCommand("execute if data storage bashcraft:aliases players run setblock 8 120 16 minecraft:stone");
+            check(!stone(server, 8), "a personal alias change that fails leaves nothing in storage");
+
             server.runCommand("scoreboard objectives add t trigger");
             server.runCommand("scoreboard players enable @a t");
             context.runOnClient(client -> client.getConnection().sendCommand("sh alias tr = trigger t set 5"));
@@ -56,6 +62,13 @@ public class BashcraftAliasCheck implements FabricClientGameTest {
             context.waitTicks(5);
             server.runCommand("execute if score @p t matches 7 run setblock 6 120 16 minecraft:stone");
             check(stone(server, 6), "/sh !! reruns the player's last line");
+
+            server.runCommand("scoreboard players set @p t 0");
+            server.runCommand("scoreboard players enable @a t");
+            context.runOnClient(client -> client.getConnection().sendCommand("sh !"));
+            context.waitTicks(5);
+            server.runCommand("execute if score @p t matches 7 run setblock 9 120 16 minecraft:stone");
+            check(!stone(server, 9), "/sh ! alone reruns nothing");
         }
     }
 
