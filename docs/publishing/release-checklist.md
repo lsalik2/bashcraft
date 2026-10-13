@@ -10,8 +10,8 @@ For publishing a new BashCraft version by hand. Written for 1.0.0; for later ver
    `JAVA_HOME=~/.jdks/jdk-25.0.4.1+1 ./gradlew updateScreenshots`, look at `docs/images/screens/`, commit.
 3. **Merge to `main` and push.** The listing's images, `fabric.mod.json`'s homepage and every guide link point at
    `main` on GitHub, so the release has to be there before anything is published.
-4. **Decide what goes public.** `docs/superpowers/` holds the design history (specs and plans); it mentions local
-   paths and another project. Keep it, or remove it before the repository goes public.
+4. **Check what goes public.** `docs/superpowers/` (the design history: specs and plans) is kept on the development
+   machine only and ignored by git; `git ls-files docs/superpowers` must print nothing.
 5. **Make the repository public** (GitHub → Settings → General → Danger Zone → Change visibility), so the listing's
    images and links work.
 6. **Build and smoke-test the jar.**
