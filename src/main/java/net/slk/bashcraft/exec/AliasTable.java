@@ -74,7 +74,9 @@ public final class AliasTable implements Aliases {
 
     @Override
     public void remove(boolean global, String name) throws ExpansionException {
-        target(global).remove(name);
+        if (target(global).remove(name) == null) {
+            throw new ExpansionException("no alias " + (global ? "global." : "") + name);
+        }
     }
 
     @Override

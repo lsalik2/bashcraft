@@ -10,6 +10,7 @@ public interface Aliases {
 
     void define(boolean global, String name, String body) throws ExpansionException;
 
+    /** Throws {@code no alias NAME} when there is none to remove. */
     void remove(boolean global, String name) throws ExpansionException;
 
     /** {@code NAME = BODY} lines: own aliases (when visible), then {@code global.NAME = BODY}. */

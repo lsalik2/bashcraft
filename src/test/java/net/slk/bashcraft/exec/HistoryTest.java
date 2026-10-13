@@ -33,4 +33,12 @@ class HistoryTest {
         assertEquals("say 59", history.lines().getLast());
         assertEquals(List.of(), new History().lines());
     }
+
+    @Test
+    void aBareBangMatchesNothing() {
+        History history = new History();
+        history.record("say hi");
+        assertEquals(Optional.empty(), history.resolve("!"), "!! reruns the last line; ! alone is not a prefix");
+        assertEquals(Optional.of("say hi"), history.resolve("!!"));
+    }
 }

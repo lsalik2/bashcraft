@@ -77,4 +77,14 @@ class AliasTableTest {
         assertEquals(List.of("ok"), AliasTable.callable(List.of("ok", "Bad", "x".repeat(40), "a b")));
         assertEquals(AliasTable.MAX_CALLABLE, names.size());
     }
+
+    @Test
+    void removingAMissingAliasFails() throws Exception {
+        AliasTable table = typed(Map.of("a", "say"), Map.of("g", "say"));
+        assertEquals("no alias b", assertThrows(ExpansionException.class, () -> table.remove(false, "b")).getMessage());
+        assertEquals("no alias global.b", assertThrows(ExpansionException.class, () -> table.remove(true, "b")).getMessage());
+        table.remove(false, "a");
+        table.remove(true, "g");
+        assertEquals(List.of(), table.listing());
+    }
 }

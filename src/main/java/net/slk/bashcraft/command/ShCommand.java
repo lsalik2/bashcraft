@@ -61,7 +61,8 @@ public final class ShCommand {
             }
             Optional<String> resolved = HistoryBook.of(Sources.typist(source).orElseThrow()).resolve(line);
             if (resolved.isEmpty()) {
-                source.sendFailure(Component.literal("BashCraft: no history matching " + line.substring(1)));
+                source.sendFailure(Component.literal(line.equals("!") ? "BashCraft: ! needs a prefix (!! reruns your last line)"
+                        : "BashCraft: no history matching " + line.substring(1)));
                 return ExecResult.failure();
             }
             line = resolved.get();

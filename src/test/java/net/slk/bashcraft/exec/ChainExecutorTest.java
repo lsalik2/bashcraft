@@ -946,4 +946,11 @@ class ChainExecutorTest {
         assertEquals(List.of("kill 2"), r.ran, "kill without % is vanilla's");
         assertTrue(jobs.live.isEmpty());
     }
+
+    @Test
+    void unaliasNeedsAnExistingName() throws Exception {
+        FakeRunner r = new FakeRunner();
+        run(r, typedShell(aliases(), null), "unalias nope ; unalias ; unalias global.", 8);
+        assertEquals(List.of("[1] no alias nope", "[2] unalias needs NAME", "[3] unalias needs NAME"), r.errors);
+    }
 }

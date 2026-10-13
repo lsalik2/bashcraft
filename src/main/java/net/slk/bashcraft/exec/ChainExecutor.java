@@ -759,8 +759,15 @@ public final class ChainExecutor {
         private ExecResult unalias(Node.Command command, String arguments) {
             String name = arguments.strip();
             boolean global = name.startsWith("global.");
+            if (global) {
+                name = name.substring(7);
+            }
+            if (name.isEmpty()) {
+                runner.reportError(label(command) + "unalias needs NAME");
+                return ExecResult.failure();
+            }
             try {
-                context.aliases().remove(global, global ? name.substring(7) : name);
+                context.aliases().remove(global, name);
                 return new ExecResult(true, 1, List.of());
             } catch (ExpansionException e) {
                 runner.reportError(label(command) + e.getMessage());

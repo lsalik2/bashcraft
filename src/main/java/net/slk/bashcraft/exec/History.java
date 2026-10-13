@@ -22,12 +22,15 @@ public final class History {
         }
     }
 
-    /** {@code !!}: the last line; {@code !PREFIX}: the most recent line starting with PREFIX. */
+    /** {@code !!}: the last line; {@code !PREFIX}: the most recent line starting with PREFIX; {@code !} alone: none. */
     public synchronized Optional<String> resolve(String reference) {
         if (reference.equals("!!")) {
             return Optional.ofNullable(lines.peekLast());
         }
         String prefix = reference.substring(1);
+        if (prefix.isEmpty()) {
+            return Optional.empty();
+        }
         for (Iterator<String> it = lines.descendingIterator(); it.hasNext(); ) {
             String line = it.next();
             if (line.startsWith(prefix)) {
