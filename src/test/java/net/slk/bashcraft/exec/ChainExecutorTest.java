@@ -988,4 +988,12 @@ class ChainExecutorTest {
         timed(r, jobs, 8).resume(jobs.queued.getFirst().continuation());
         assertEquals(List.of("say done now"), r.ran);
     }
+
+    @Test
+    void backgroundOfAFailureStillReportsSuccessAcrossANestedSh() throws Exception {
+        ExecResult failed = run(new FakeRunner().on("fail", FAIL), "fail &");
+        assertTrue(failed.success() && failed.result() > 0, "/sh reports success as result > 0, so a nested sh or execute store sees it: " + failed);
+        ExecResult counted = run(new FakeRunner().on("count", new ExecResult(true, 5, List.of())), "count &");
+        assertEquals(5, counted.result(), "a body that succeeded keeps its result");
+    }
 }

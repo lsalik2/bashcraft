@@ -356,7 +356,9 @@ public final class ChainExecutor {
             state.lastStatus = 0;
             if (halt == null) {
                 ExecResult ran = body.result();
-                return new Outcome(new ExecResult(true, false, ran.result(), ran.output(), ran.value()), body.lastCommand());
+                // Success means a result above 0 once it leaves /sh (a nested sh, execute store), so a failed body counts 1.
+                int result = ran.success() && ran.result() > 0 ? ran.result() : 1;
+                return new Outcome(new ExecResult(true, false, result, ran.output(), ran.value()), body.lastCommand());
             }
             try {
                 context.jobs().queue(new Continuation(detached(halt.frames())), halt.delay(), ChainFormatter.toSh(shown(background.body())));
