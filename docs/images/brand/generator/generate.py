@@ -1,8 +1,8 @@
 """Writes BashCraft's brand images from Minecraft's own textures and font.
 
-    python3 branding/generate.py              # (re)write the images
-    python3 branding/generate.py --check      # exit 1 if a committed image differs from a fresh render
-    python3 branding/generate.py --jar PATH   # use a specific Minecraft 26.3 client jar
+    python3 docs/images/brand/generator/generate.py              # (re)write the images
+    python3 docs/images/brand/generator/generate.py --check      # exit 1 if a committed image differs from a fresh render
+    python3 docs/images/brand/generator/generate.py --jar PATH   # use a specific Minecraft 26.3 client jar
 """
 import argparse
 import os
@@ -15,7 +15,8 @@ from draw import Font  # noqa: E402
 from jar import Assets, find_jar  # noqa: E402
 from png import encode, upscale  # noqa: E402
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# This folder is docs/images/brand/generator: the repository root is four levels up.
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 # (output path relative to the repo root, image function, scale)
 OUTPUTS = [
     ("src/main/resources/assets/bashcraft/icon.png", assets.icon, 4),

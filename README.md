@@ -83,8 +83,8 @@ Needs JDK 25 (point `JAVA_HOME` at it) and, for the brand images, Python 3.
 ./gradlew test                             # unit tests, including the docs checks
 ./gradlew runClientGameTest                # in-game tests, every guide snippet included (headless on Xvfb if installed)
 ./gradlew updateScreenshots                # re-capture docs/images/screens
-python3 branding/generate.py [--check]     # render (or check) the brand images
-python3 -m unittest discover -s branding   # branding tests
+python3 docs/images/brand/generator/generate.py [--check]     # render (or check) the brand images
+python3 -m unittest discover -s docs/images/brand/generator   # branding tests
 ```
 
 ## License

@@ -1,4 +1,4 @@
-"""python3 -m unittest discover -s branding -v"""
+"""python3 -m unittest discover -s docs/images/brand/generator -v"""
 import hashlib
 import os
 import sys
