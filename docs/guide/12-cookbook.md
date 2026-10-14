@@ -97,7 +97,7 @@ Night for five seconds, then day again.
 /sh time set night ; sleep 5s ; time set day
 ```
 
-### A short shower
+### A short rain
 
 **Give it a try!**
 
