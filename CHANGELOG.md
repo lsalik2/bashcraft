@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 1.0.0 — first release
 
 **Chains**

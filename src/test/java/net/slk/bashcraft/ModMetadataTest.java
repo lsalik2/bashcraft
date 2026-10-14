@@ -53,8 +53,15 @@ class ModMetadataTest {
     }
 
     @Test
-    void versionIsOnePointZero() throws IOException {
-        assertEquals("1.0.0", version());
+    void versionLooksLikeMajorMinorPatch() throws IOException {
+        assertTrue(version().matches("\\d+\\.\\d+\\.\\d+"), "mod_version is N.N.N: " + version());
+    }
+
+    @Test
+    void changelogCollectsChangesUnderUnreleasedFirst() throws IOException {
+        String first = Files.readAllLines(Path.of("CHANGELOG.md")).stream()
+                .filter(line -> line.startsWith("## ")).findFirst().orElse("");
+        assertEquals("## Unreleased", first.strip(), "the release workflow renames this section");
     }
 
     @Test
