@@ -1,0 +1,9 @@
+# Keeps the workflows' pinned actions current. Minecraft, Fabric and Gradle versions are bumped by hand, on purpose.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - "/"
+      - "/.github/actions/test"
+    schedule:
+      interval: monthly

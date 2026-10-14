@@ -162,4 +162,18 @@ class DocsTest {
                 "listing.md: https://raw.githubusercontent.com/lsalik2/bashcraft/main/docs/images/b.png points at a missing file"),
                 DocsLinks.badRepoUrls("listing.md", text, root));
     }
+
+    @Test
+    void repoUrlCheckKnowsWorkflowBadgesAndPrivateReports() throws IOException {
+        Path root = Files.createTempDirectory("repo");
+        Files.createDirectories(root.resolve(".github/workflows"));
+        Files.writeString(root.resolve(".github/workflows/ci.yml"), "name: CI\n");
+        String text = """
+                [![CI](https://github.com/lsalik2/bashcraft/actions/workflows/ci.yml/badge.svg)](https://github.com/lsalik2/bashcraft/actions/workflows/ci.yml)
+                [report](https://github.com/lsalik2/bashcraft/security/advisories/new)
+                ![gone](https://github.com/lsalik2/bashcraft/actions/workflows/nightly.yml/badge.svg)
+                """;
+        assertEquals(List.of("README.md: https://github.com/lsalik2/bashcraft/actions/workflows/nightly.yml/badge.svg names a missing workflow"),
+                DocsLinks.badRepoUrls("README.md", text, root));
+    }
 }

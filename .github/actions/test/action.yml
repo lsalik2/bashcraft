@@ -1,0 +1,36 @@
+name: Test BashCraft
+description: Builds BashCraft and runs every check — unit and docs tests, the in-game tests headless, the Python checks.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      with:
+        distribution: temurin
+        java-version: "25"
+    - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+    - name: Install a virtual display and software Vulkan
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends xvfb mesa-vulkan-drivers
+    - name: Build, then run the unit, docs and in-game tests
+      shell: bash
+      run: ./gradlew build runClientGameTest -Pheadless=true
+    - name: Python checks (brand images, release script)
+      shell: bash
+      run: |
+        python3 -m unittest discover -s docs/images/brand/generator
+        python3 -m unittest discover -s .github/scripts
+        python3 docs/images/brand/generator/generate.py --check
+    - name: Keep the reports and game logs
+      if: failure()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: test-reports-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          build/reports
+          build/test-results
+          build/xvfb.log
+          build/run/clientGameTest/logs
+          build/run/clientGameTest/screenshots
+        if-no-files-found: ignore

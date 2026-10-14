@@ -1,5 +1,7 @@
 <p align="center"><img src="docs/images/brand/banner.png" alt="BashCraft" width="720"></p>
 
+<p align="center"><a href="https://github.com/lsalik2/bashcraft/actions/workflows/ci.yml"><img src="https://github.com/lsalik2/bashcraft/actions/workflows/ci.yml/badge.svg" alt="CI status"></a></p>
+
 <p align="center"><b>A bash shell for the command line: set timers, chain commands and much more.</b></p>
 
 BashCraft is a Fabric mod that brings the best small ideas of bash to Minecraft commands. Run a command only if

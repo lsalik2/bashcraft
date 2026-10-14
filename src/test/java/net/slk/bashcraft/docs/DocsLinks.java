@@ -13,9 +13,11 @@ final class DocsLinks {
 
     /** Any GitHub URL naming this repo's owner, or any raw.githubusercontent.com URL. */
     private static final Pattern REPO_URL = Pattern.compile("https://(?:raw\\.githubusercontent\\.com|github\\.com/lsalik2)/[^)\\s\"'>]*");
-    /** The forms a link to this repo may take: its home, its issues, or a file or folder on main. */
+    /** The forms a link to this repo may take: its home, its issues, private reports, or a file or folder on main. */
     private static final Pattern GOOD = Pattern.compile(
-            "https://github\\.com/lsalik2/bashcraft(?:/issues)?|https://(?:raw\\.githubusercontent\\.com/lsalik2/bashcraft/main|github\\.com/lsalik2/bashcraft/(?:blob|tree)/main)/(.+)");
+            "https://github\\.com/lsalik2/bashcraft(?:/issues|/security/advisories/new)?|https://(?:raw\\.githubusercontent\\.com/lsalik2/bashcraft/main|github\\.com/lsalik2/bashcraft/(?:blob|tree)/main)/(.+)");
+    /** A workflow's page or status badge. */
+    private static final Pattern WORKFLOW = Pattern.compile("https://github\\.com/lsalik2/bashcraft/actions/workflows/([\\w.-]+\\.yml)(?:/badge\\.svg)?");
 
     private DocsLinks() {}
 
@@ -25,6 +27,13 @@ final class DocsLinks {
         Matcher m = REPO_URL.matcher(text);
         while (m.find()) {
             String url = m.group().replaceFirst("#.*$", "");
+            Matcher workflow = WORKFLOW.matcher(url);
+            if (workflow.matches()) {
+                if (!Files.exists(root.resolve(".github/workflows").resolve(workflow.group(1)))) {
+                    bad.add(name + ": " + url + " names a missing workflow");
+                }
+                continue;
+            }
             Matcher good = GOOD.matcher(url);
             if (!good.matches()) {
                 bad.add(name + ": " + url + " is not a main-branch link to this repo");
