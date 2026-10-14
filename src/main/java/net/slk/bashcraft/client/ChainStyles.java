@@ -54,15 +54,9 @@ public final class ChainStyles {
                 fill(styles, span.start(), span.end(), SYNTAX);
                 continue;
             }
-            int start = span.start();
-            Builtins.Kind kind = Builtins.classify(value.substring(span.start(), span.end())).kind();
-            if (kind == Builtins.Kind.NONE && ClientChains.isAlias(value.substring(span.start(), span.end()).strip().split("\\s", 2)[0])) {
-                continue;
-            }
-            if (kind == Builtins.Kind.EACH && span.end() - span.start() > 5) {
-                // each's body is an ordinary command: colour it like one.
-                start = span.start() + 5;
-            } else if (kind != Builtins.Kind.NONE) {
+            // each's body is a command of its own: colour it like one, unless BashCraft runs it.
+            int start = span.start() + Builtins.eachBody(value.substring(span.start(), span.end()));
+            if (ClientChains.isBashcraft(value.substring(start, span.end()))) {
                 continue;
             }
             StringReader reader = new StringReader(masked.substring(0, span.end()));

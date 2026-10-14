@@ -62,10 +62,16 @@ public class BashcraftChatCheck implements FabricClientGameTest {
             context.runOnClient(client -> ChatProbe.open(client, "/sh list | grep x | each tp @s ~ ~1 ~ | store storage bashcraft:t v"));
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "pipe builtins are not shown as errors");
+            context.runOnClient(client -> ChatProbe.open(client, "/sh list | each echo {value} is online"));
+            context.waitTicks(2);
+            check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)),
+                    "a builtin run by each is not shown as an error");
+            context.runOnClient(client -> ChatProbe.open(client, "/sh list | each each gamemode "));
+            context.waitFor(client -> ChatProbe.completions(client).contains("creative"), 100);
 
             context.runOnClient(client -> client.getConnection().sendCommand("sh alias hb = say hi"));
             context.waitTicks(5);
-            context.runOnClient(client -> ChatProbe.open(client, "/sh hb && hb"));
+            context.runOnClient(client -> ChatProbe.open(client, "/sh hb && list | each hb"));
             context.waitTicks(2);
             check(context.computeOnClient(client -> !ChatProbe.colors(client).contains(ChatProbe.RED)), "alias calls are not shown as errors");
             context.runOnClient(client -> ChatProbe.open(client, "/sh echo a ; sleep 1s & jobs ; kill %1"));

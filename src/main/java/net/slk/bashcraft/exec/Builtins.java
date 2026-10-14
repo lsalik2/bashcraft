@@ -41,6 +41,21 @@ public final class Builtins {
         return new Call(Kind.NONE, "", command);
     }
 
+    /**
+     * Where the command each runs starts in {@code command}: past every leading {@code each } word and the spaces after
+     * it (each can run each); 0 when the command doesn't start with one.
+     */
+    public static int eachBody(String command) {
+        int start = 0;
+        while (command.startsWith("each ", start)) {
+            start += 5;
+            while (start < command.length() && command.charAt(start) == ' ') {
+                start++;
+            }
+        }
+        return start;
+    }
+
     /** Removes one pair of matching surrounding quotes. */
     public static String unquote(String value) {
         if (value.length() >= 2) {

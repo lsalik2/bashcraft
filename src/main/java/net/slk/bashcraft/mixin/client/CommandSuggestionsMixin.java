@@ -88,10 +88,10 @@ public abstract class CommandSuggestionsMixin {
         try {
             ChainLayout.Window window = layout.window(input.getCursorPosition());
             int start = window.start();
-            if (window.start() < window.end() && bashcraft$kindAt(window) == Builtins.Kind.EACH
-                    && input.getCursorPosition() >= window.start() + 5) {
+            int body = window.start() + Builtins.eachBody(bashcraft$text(window));
+            if (input.getCursorPosition() >= body) {
                 // In each's body, complete the body as a command of its own.
-                start = window.start() + 5;
+                start = body;
             }
             StringReader command = new StringReader(Placeholders.mask(Expander.mask(input.getValue().substring(0, window.end()))));
             command.setCursor(start);
@@ -157,25 +157,22 @@ public abstract class CommandSuggestionsMixin {
         }
     }
 
-    /** Whether the cursor is in a builtin vanilla can't parse (x=…, unset, echo, grep, store; each's own word). */
+    /** Whether the cursor is in something vanilla can't parse: a builtin, an alias call, or each's own words. */
     @Unique
     private boolean bashcraft$builtinAt(ChainLayout layout, int cursor) {
         ChainLayout.Window window = layout.window(cursor);
         if (window.start() >= window.end()) {
             return false;
         }
-        Builtins.Kind kind = bashcraft$kindAt(window);
-        if (kind == Builtins.Kind.NONE) {
-            String value = input.getValue();
-            String word = value.substring(window.start(), Math.min(window.end(), value.length())).strip().split("\\s", 2)[0];
-            return ClientChains.isAlias(word);
-        }
-        return !(kind == Builtins.Kind.EACH && cursor >= window.start() + 5);
+        String command = bashcraft$text(window);
+        int body = Builtins.eachBody(command);
+        // In each's own words nothing is suggested; in its body, the body decides.
+        return cursor < window.start() + body || ClientChains.isBashcraft(command.substring(body));
     }
 
     @Unique
-    private Builtins.Kind bashcraft$kindAt(ChainLayout.Window window) {
+    private String bashcraft$text(ChainLayout.Window window) {
         String value = input.getValue();
-        return Builtins.classify(value.substring(window.start(), Math.min(window.end(), value.length())).strip()).kind();
+        return value.substring(Math.min(window.start(), value.length()), Math.min(window.end(), value.length()));
     }
 }

@@ -60,4 +60,15 @@ class BuiltinsTest {
         assertEquals(Builtins.Kind.NONE, Builtins.classify("kill").kind());
         assertEquals(Builtins.Kind.NONE, Builtins.classify("kill 2").kind());
     }
+
+    @Test
+    void eachBodyStartsAfterEveryEachWord() {
+        assertEquals(5, Builtins.eachBody("each echo {value} is online"));
+        assertEquals(7, Builtins.eachBody("each   tp @s ~ ~1 ~"));
+        assertEquals(10, Builtins.eachBody("each each gamemode creative"));
+        assertEquals(5, Builtins.eachBody("each "));
+        assertEquals(0, Builtins.eachBody("each"));
+        assertEquals(0, Builtins.eachBody("echo each "));
+        assertEquals(0, Builtins.eachBody("eachother x"));
+    }
 }

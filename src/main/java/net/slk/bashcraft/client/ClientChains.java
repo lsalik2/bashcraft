@@ -1,6 +1,7 @@
 package net.slk.bashcraft.client;
 
 import net.slk.bashcraft.chain.ChainLayout;
+import net.slk.bashcraft.exec.Builtins;
 import net.slk.bashcraft.network.HelloPayload;
 
 import java.util.List;
@@ -34,6 +35,12 @@ public final class ClientChains {
     /** Whether {@code word} calls one of the player's aliases (so it is coloured as a builtin, not parsed by vanilla). */
     public static boolean isAlias(String word) {
         return active && aliasNames.contains(word);
+    }
+
+    /** Whether BashCraft runs {@code command}, not vanilla: a builtin or a call of one of the player's aliases. */
+    public static boolean isBashcraft(String command) {
+        String text = command.strip();
+        return Builtins.classify(text).kind() != Builtins.Kind.NONE || isAlias(text.split("\\s", 2)[0]);
     }
 
     public static boolean active() {
