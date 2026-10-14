@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, like 1.1.0 (the changelog's Unreleased section becomes its notes)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run: test and show what would be published, without pushing or uploading anything"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release ${{ inputs.version }}${{ inputs.dry_run && ' (dry run)' || '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ inputs.version }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - name: Real releases come from main
+        if: ${{ !inputs.dry_run && github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Releases are made from main, not $GITHUB_REF_NAME (a dry run may use any branch)."
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: The version must be new
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            echo "::error::v$VERSION is already tagged. If an upload failed after it was pushed, use the Republish workflow."
+            exit 1
+          fi
+      - name: Prepare the changelog and version
+        run: python3 .github/scripts/release.py prepare "$VERSION" --date "$(date -u +%F)"
+      - uses: ./.github/actions/test
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Release $VERSION" -- CHANGELOG.md gradle.properties
+          git tag -a "v$VERSION" -m "BashCraft v$VERSION"
+      - name: Push the release commit and tag
+        if: ${{ !inputs.dry_run }}
+        run: git push --atomic origin "HEAD:refs/heads/main" "refs/tags/v$VERSION"
+      - name: Publish
+        env:
+          BASHCRAFT_PUBLISH: ${{ inputs.dry_run && 'false' || 'true' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          tasks=(publishGithub)
+          for site in Modrinth Curseforge; do
+            token_name="$(echo "$site" | tr '[:lower:]' '[:upper:]')_TOKEN"
+            if [ -n "${!token_name}" ]; then
+              tasks+=("publish$site")
+            elif [ "$BASHCRAFT_PUBLISH" = true ]; then
+              echo "- $site skipped: the $token_name secret isn't set. Upload later with the Republish workflow." >> "$GITHUB_STEP_SUMMARY"
+            else
+              tasks+=("publish$site")
+              echo "- $site would be skipped in a real release: the $token_name secret isn't set." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          ./gradlew "${tasks[@]}" -PreleaseNotes=build/release-notes.md
+          if [ "$BASHCRAFT_PUBLISH" = true ]; then
+            echo "Released BashCraft v$VERSION: ${tasks[*]}." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Save what the dry run would have done
+        if: ${{ inputs.dry_run }}
+        run: git show --stat --patch HEAD > build/release-commit.diff
+      - name: Keep the dry run's results
+        if: ${{ inputs.dry_run }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-dry-run
+          path: |
+            build/release-notes.md
+            build/release-commit.diff
+            build/publishMods

@@ -1,0 +1,61 @@
+name: Republish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "A version the Release workflow already tagged, like 1.1.0"
+        required: true
+        type: string
+      site:
+        description: "Where to upload it again"
+        required: true
+        type: choice
+        options: [github, modrinth, curseforge]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  republish:
+    name: Upload ${{ inputs.version }} to ${{ inputs.site }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ inputs.version }}
+      SITE: ${{ inputs.site }}
+    steps:
+      - name: The version must look like 1.2.3
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not a version like 1.2.3 (digits only, no v)."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Release notes from the tagged changelog
+        run: python3 .github/scripts/release.py notes "$VERSION" > "$RUNNER_TEMP/release-notes.md"
+      - name: Upload
+        env:
+          BASHCRAFT_PUBLISH: "true"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          case "$SITE" in
+            github) task=publishGithub ;;
+            modrinth) task=publishModrinth ;;
+            curseforge) task=publishCurseforge ;;
+          esac
+          ./gradlew "$task" -PreleaseNotes="$RUNNER_TEMP/release-notes.md"
+          echo "Uploaded BashCraft v$VERSION to $SITE." >> "$GITHUB_STEP_SUMMARY"
