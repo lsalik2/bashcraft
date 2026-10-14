@@ -1,5 +1,6 @@
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'me.modmuss50.mod-publish-plugin' version '2.2.1'
 }
 
 version = project.mod_version
@@ -66,6 +67,44 @@ java {
 	withSourcesJar()
 	sourceCompatibility = JavaVersion.VERSION_25
 	targetCompatibility = JavaVersion.VERSION_25
+}
+
+// Uploads a release to GitHub, Modrinth and CurseForge (spec E §4). The Release workflow runs it with
+// BASHCRAFT_PUBLISH=true and the tokens; anywhere else it's a dry run that writes what it would send to
+// build/publishMods. -PreleaseNotes names the notes file (python3 .github/scripts/release.py notes VERSION > FILE).
+def releaseNotes = providers.gradleProperty("releaseNotes")
+publishMods {
+	file = jar.archiveFile
+	displayName = "BashCraft v${project.version}"
+	changelog = releaseNotes.map { file(it).text }.orElse(providers.provider {
+		throw new GradleException("Publishing needs release notes: python3 .github/scripts/release.py notes ${project.version} > build/release-notes.md, then -PreleaseNotes=build/release-notes.md")
+	})
+	type = STABLE
+	modLoaders.add("fabric")
+	dryRun = providers.environmentVariable("BASHCRAFT_PUBLISH").map { it != "true" }.orElse(true)
+
+	github {
+		accessToken = providers.environmentVariable("GITHUB_TOKEN")
+		repository = "lsalik2/bashcraft"
+		commitish = "main"
+		tagName = "v${project.version}"
+	}
+	modrinth {
+		accessToken = providers.environmentVariable("MODRINTH_TOKEN")
+		projectId = project.modrinth_id
+		minecraftVersions.add(project.minecraft_version)
+		requires("fabric-api")
+	}
+	curseforge {
+		accessToken = providers.environmentVariable("CURSEFORGE_TOKEN")
+		projectId = project.curseforge_id
+		minecraftVersions.add(project.minecraft_version)
+		javaVersions.add(JavaVersion.VERSION_25)
+		client = true
+		server = true
+		requires("fabric-api")
+		changelogType = "markdown"
+	}
 }
 
 // Headless client game tests: where an Xvfb is installed (~/.local/bin/Xvfb on the WSL dev machine), runClientGameTest
