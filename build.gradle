@@ -40,8 +40,10 @@ dependencies {
 test {
 	useJUnitPlatform()
 	// DocsTest and ModMetadataTest read these files: a docs-only change must still re-run them.
-	inputs.files("README.md", "CHANGELOG.md", "LICENSE", "gradle.properties").optional()
+	inputs.files("README.md", "CHANGELOG.md", "LICENSE", "gradle.properties", "CONTRIBUTING.md", "SECURITY.md").optional()
 	inputs.dir("docs").optional()
+	// The contribution templates' links, and the workflows that README badges name.
+	inputs.files(fileTree(".github") { exclude "**/__pycache__/**" })
 }
 
 processResources {
