@@ -24,8 +24,14 @@ You need JDK 25. Point `JAVA_HOME` at it, then:
     python3 docs/images/brand/generator/generate.py --check       # brand images match their scripts
 
 The in-game tests start a real Minecraft client and open its window. On Linux with Xvfb installed they run on a
-virtual display instead (`-Pheadless=true` forces it, `-Pheadless=false` shows the window). CI runs everything on
-every pull request, so it's fine to rely on it if the in-game tests won't run on your machine.
+virtual display instead (`-Pheadless=true` forces it, `-Pheadless=false` shows the window). Headless runs draw with
+Mesa's software Vulkan, so install both: on Debian or Ubuntu, `sudo apt install xvfb mesa-vulkan-drivers`. CI runs
+everything on every pull request, so it's fine to rely on it if the in-game tests won't run on your machine.
+
+When something visible changes:
+
+    ./gradlew updateScreenshots                         # re-capture the guide's screenshots in docs/images/screens
+    python3 docs/images/brand/generator/generate.py     # re-render the brand images after editing their scripts
 
 ## Where things are
 

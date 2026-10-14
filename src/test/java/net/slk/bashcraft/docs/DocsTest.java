@@ -121,6 +121,17 @@ class DocsTest {
     }
 
     @Test
+    void contributingKeepsTheMaintenanceCommands() throws IOException {
+        String text = Files.readString(ROOT.resolve("CONTRIBUTING.md"));
+        List<String> missing = new ArrayList<>(Stream.of("./gradlew updateScreenshots", "xvfb mesa-vulkan-drivers")
+                .filter(command -> !text.contains(command)).toList());
+        if (!Pattern.compile("generate\\.py\\s+#").matcher(text).find()) {
+            missing.add("generate.py (re-render, without --check)");
+        }
+        assertEquals(List.of(), missing, "the README used to list these; CONTRIBUTING.md is where they live now");
+    }
+
+    @Test
     void everyRelativeLinkAndImageResolves() throws IOException {
         List<String> broken = new ArrayList<>();
         for (Path file : linkedFiles()) {
