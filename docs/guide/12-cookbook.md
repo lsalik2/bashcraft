@@ -27,14 +27,15 @@ Look for one biome and fall back to another; whichever is found gets piped on.
 
 ### Mark a spot and come back
 
-Remember where you are, wander off, then return.
+Remember where you are, wander off, then come back to the same block. Saving the height too means you never land
+inside a hill.
 
 **Give it a try!**
 
 ```text
-/sh mark_x=$(data get entity @s Pos[0]) ; mark_z=$(data get entity @s Pos[2]) ; echo marked $mark_x $mark_z
-/sh tp @s ~30 ~ ~
-/sh tp @s $mark_x ~ $mark_z
+/sh mark_x=$(data get entity @s Pos[0]) ; mark_y=$(data get entity @s Pos[1]) ; mark_z=$(data get entity @s Pos[2]) ; echo marked $mark_x $mark_y $mark_z
+/sh tp @s ~30 ~10 ~
+/sh tp @s $mark_x $mark_y $mark_z
 ```
 
 ### A soft landing

@@ -72,10 +72,10 @@ you notice.
 **Give it a try!**
 <!-- try: errors expected -->
 ```text
-/sh unset x ; echo $x
+/sh x=5 ; echo $x ; unset x ; echo $x
 ```
 
-You'll see `$x is not set`.
+You'll see `5`, then `[4] $x is not set`: the fourth command, the last `echo`, failed because `x` is gone.
 
 ## Rules and limits
 
