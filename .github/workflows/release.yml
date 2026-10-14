@@ -61,22 +61,39 @@ jobs:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
         run: |
-          tasks=(publishGithub)
-          for site in Modrinth Curseforge; do
-            token_name="$(echo "$site" | tr '[:lower:]' '[:upper:]')_TOKEN"
+          # Every site is tried even if one fails (--continue); the summary says which ones got the upload.
+          sites=(GitHub)
+          for site in Modrinth CurseForge; do
+            token_name="${site^^}_TOKEN"
             if [ -n "${!token_name}" ]; then
-              tasks+=("publish$site")
+              sites+=("$site")
             elif [ "$BASHCRAFT_PUBLISH" = true ]; then
               echo "- $site skipped: the $token_name secret isn't set. Upload later with the Republish workflow." >> "$GITHUB_STEP_SUMMARY"
             else
-              tasks+=("publish$site")
+              sites+=("$site")
               echo "- $site would be skipped in a real release: the $token_name secret isn't set." >> "$GITHUB_STEP_SUMMARY"
             fi
           done
-          ./gradlew "${tasks[@]}" -PreleaseNotes=build/release-notes.md
-          if [ "$BASHCRAFT_PUBLISH" = true ]; then
-            echo "Released BashCraft v$VERSION: ${tasks[*]}." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          tasks=()
+          for site in "${sites[@]}"; do
+            lower="${site,,}"
+            tasks+=("publish${lower^}")
+          done
+          status=0
+          ./gradlew --continue "${tasks[@]}" -PreleaseNotes=build/release-notes.md || status=$?
+          for site in "${sites[@]}"; do
+            lower="${site,,}"
+            if [ ! -f "build/publishMods/publish${lower^}.json" ]; then
+              hint=""
+              [ "$site" = GitHub ] && hint=" Delete any draft release it left behind first."
+              echo "- $site failed (see the log above). Once it's fixed, run Republish with version $VERSION and site $lower.$hint"
+            elif [ "$BASHCRAFT_PUBLISH" = true ]; then
+              echo "- $site: BashCraft v$VERSION uploaded."
+            else
+              echo "- $site: dry run OK."
+            fi
+          done >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
       - name: Save what the dry run would have done
         if: ${{ inputs.dry_run }}
         run: git show --stat --patch HEAD > build/release-commit.diff
