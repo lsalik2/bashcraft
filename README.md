@@ -78,16 +78,13 @@ off. Every setting is described in [Configuration](docs/guide/11-configuration.m
 
 ## Building
 
-Needs JDK 25 (point `JAVA_HOME` at it) and, for the brand images, Python 3.
+Needs JDK 25: `./gradlew build` puts the jar in `build/libs`. [CONTRIBUTING.md](CONTRIBUTING.md) covers the tests,
+the code layout and the guide's rules.
 
-```
-./gradlew build                            # jar in build/libs
-./gradlew test                             # unit tests, including the docs checks
-./gradlew runClientGameTest                # in-game tests, every guide snippet included (headless on Xvfb if installed)
-./gradlew updateScreenshots                # re-capture docs/images/screens
-python3 docs/images/brand/generator/generate.py [--check]     # render (or check) the brand images
-python3 -m unittest discover -s docs/images/brand/generator   # branding tests
-```
+## Contributing
+
+Bug reports, ideas and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security
+problems privately, as [SECURITY.md](SECURITY.md) explains.
 
 ## License
 

@@ -1,0 +1,23 @@
+name: Feature suggestion
+description: An idea for something BashCraft could do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What would you like to do?
+      description: The goal in the game, not just the syntax — for example "give every player in a team a different kit".
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: How you'd like to type it
+      description: Optional. An example line, even if it doesn't work today.
+      placeholder: /sh list | sort | head -n 3
+      render: text
+  - type: textarea
+    id: today
+    attributes:
+      label: How you manage today
+      description: Optional. Commands, datapacks or other mods you use for it now.

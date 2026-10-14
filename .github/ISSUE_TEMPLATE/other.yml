@@ -1,0 +1,10 @@
+name: Something else
+description: A question, a docs fix, or anything that isn't a bug or a suggestion.
+labels: [question]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What's on your mind?
+    validations:
+      required: true

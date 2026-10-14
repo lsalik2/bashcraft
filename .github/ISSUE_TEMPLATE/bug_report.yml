@@ -1,0 +1,91 @@
+name: Bug report
+description: Something in BashCraft doesn't work the way the guide says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! The exact line you typed and the exact messages you saw help most.
+        Found a way around permissions or limits? Please report it privately instead (see SECURITY.md).
+  - type: input
+    id: bashcraft
+    attributes:
+      label: BashCraft version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: minecraft
+    attributes:
+      label: Minecraft version
+      placeholder: "26.3"
+    validations:
+      required: true
+  - type: input
+    id: fabric-api
+    attributes:
+      label: Fabric API version
+      placeholder: "0.161.0+26.3"
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did it happen?
+      options:
+        - Singleplayer
+        - Open to LAN
+        - Dedicated server
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Is BashCraft also installed on your client?
+      description: The client part adds chat colours, error hints and tab completion. It's optional.
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: typed
+    attributes:
+      label: What you typed
+      description: The exact line, command block or function line, copied rather than retyped.
+      placeholder: "/sh locate structure #village | surface | tp @s"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: Copy the exact chat messages, especially red ones.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: "Optional: latest.log from .minecraft/logs (or the server's logs folder), or a link to it on mclo.gs."
+      render: text
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods
+      description: Optional, but mods that change commands or chat matter most.
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before you send
+      options:
+        - label: I checked the [troubleshooting page](https://github.com/lsalik2/bashcraft/blob/main/docs/guide/13-troubleshooting.md).
+          required: true

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -95,10 +96,37 @@ class DocsTest {
         assertEquals(List.of(), problems);
     }
 
+    /** Every file whose links the checks cover: the docs, the contribution files and GitHub's templates. */
+    private static List<Path> linkedFiles() throws IOException {
+        List<Path> files = new ArrayList<>(GuideSnippets.docFiles(ROOT));
+        for (String name : List.of("CONTRIBUTING.md", "SECURITY.md", ".github/pull_request_template.md")) {
+            files.add(ROOT.resolve(name));
+        }
+        Path forms = ROOT.resolve(".github/ISSUE_TEMPLATE");
+        if (Files.isDirectory(forms)) {
+            try (Stream<Path> s = Files.list(forms)) {
+                s.sorted().forEach(files::add);
+            }
+        }
+        return files.stream().filter(Files::exists).toList();
+    }
+
+    @Test
+    void contributionFilesExist() {
+        List<String> missing = Stream.of("CONTRIBUTING.md", "SECURITY.md", ".github/pull_request_template.md",
+                        ".github/ISSUE_TEMPLATE/bug_report.yml", ".github/ISSUE_TEMPLATE/feature_request.yml",
+                        ".github/ISSUE_TEMPLATE/other.yml", ".github/ISSUE_TEMPLATE/config.yml")
+                .filter(name -> !Files.exists(ROOT.resolve(name))).toList();
+        assertEquals(List.of(), missing);
+    }
+
     @Test
     void everyRelativeLinkAndImageResolves() throws IOException {
         List<String> broken = new ArrayList<>();
-        for (Path file : GuideSnippets.docFiles(ROOT)) {
+        for (Path file : linkedFiles()) {
+            if (!file.toString().endsWith(".md")) {
+                continue;
+            }
             broken.addAll(DocsLinks.broken(file, Files.readAllLines(file), ROOT));
         }
         assertEquals(List.of(), broken);
@@ -107,7 +135,7 @@ class DocsTest {
     @Test
     void repoUrlsPointAtRepoFiles() throws IOException {
         List<String> bad = new ArrayList<>();
-        for (Path file : GuideSnippets.docFiles(ROOT)) {
+        for (Path file : linkedFiles()) {
             bad.addAll(DocsLinks.badRepoUrls(ROOT.relativize(file).toString(), Files.readString(file), ROOT));
         }
         assertEquals(List.of(), bad);

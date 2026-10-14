@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the guide
+    url: https://github.com/lsalik2/bashcraft/tree/main/docs/guide
+    about: Every feature, with examples you can paste into your game.
+  - name: Troubleshooting
+    url: https://github.com/lsalik2/bashcraft/blob/main/docs/guide/13-troubleshooting.md
+    about: Answers to the usual surprises, like red chat or a chain that stops early.
+  - name: Report a security problem
+    url: https://github.com/lsalik2/bashcraft/security/advisories/new
+    about: A way around permissions or limits. Please report it privately, not as an issue.
