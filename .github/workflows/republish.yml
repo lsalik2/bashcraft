@@ -53,7 +53,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Release notes from the tagged changelog
         run: python3 .github/scripts/release.py notes "$VERSION" > "$RUNNER_TEMP/release-notes.md"
       - name: Upload
